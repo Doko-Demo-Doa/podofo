@@ -102,6 +102,11 @@ namespace PoDoFo
         /// @remarks the total reserved size is reset on Reset()
         void ReserveAttributeSize(unsigned attrSize);
 
+        /// Add an extra X.509 certificate (DER or PEM) to the CMS "certificates" collection,
+        /// without making it a signer (eg. to embed the intermediate/chain certificates)
+        /// @remarks unlike attributes, added certificates survive a Reset()
+        void AddCertificate(const bufferview& cert);
+
     public:
         unsigned GetSignedHashSize() const;
 
@@ -126,6 +131,7 @@ namespace PoDoFo
         struct evp_pkey_st* m_privKey;
         PdfSignerCmsParams m_parameters;
         unsigned m_reservedSize;
+        std::vector<charbuff> m_chainCertificates;
 
         // Temporary buffer variables
         // NOTE: Don't clear it in Reset() override

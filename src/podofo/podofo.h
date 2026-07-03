@@ -107,4 +107,8 @@
 #include "main/PdfXObjectForm.h"
 #include "main/PdfXObjectPostScript.h"
 
+// Included last: uses PdfMemDocument/PdfPage/PdfAcroForm/PdfSignature/
+// FileStreamDevice/PdfSignerCms/PdfSigningContext, all included above
+#include "main/PdfRemoteSignDocumentSession.h"
+
 #endif // PODOFO_H
