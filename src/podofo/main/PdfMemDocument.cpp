@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2006 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2006 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfMemDocument.h"
@@ -24,8 +22,9 @@ PdfMemDocument::PdfMemDocument(bool empty) :
     m_Version(PdfVersionDefault),
     m_InitialVersion(PdfVersionDefault),
     m_HasXRefStream(false),
+    m_HasBrokenXRef(false),
     m_MagicOffset(0),
-    m_PrevXRefOffset(0) // 0 is a sentinel for invalid XRef offset
+    m_PrevXRefOffset(0) // 0 is a sentinel for no or invalid XRef offset
 {
 }
 
@@ -52,6 +51,7 @@ PdfMemDocument::PdfMemDocument(const PdfMemDocument& rhs) :
     m_Version(rhs.m_Version),
     m_InitialVersion(rhs.m_InitialVersion),
     m_HasXRefStream(rhs.m_HasXRefStream),
+    m_HasBrokenXRef(rhs.m_HasBrokenXRef),
     m_MagicOffset(rhs.m_MagicOffset),
     m_PrevXRefOffset(rhs.m_PrevXRefOffset)
 {
@@ -73,6 +73,8 @@ void PdfMemDocument::reset()
     m_Version = PdfVersionDefault;
     m_InitialVersion = PdfVersionDefault;
     m_HasXRefStream = false;
+    m_HasBrokenXRef = false;
+    m_MagicOffset = 0;
     m_PrevXRefOffset = 0;
 }
 
@@ -81,16 +83,10 @@ void PdfMemDocument::initFromParser(PdfParser& parser)
     m_Version = parser.GetPdfVersion();
     m_InitialVersion = m_Version;
     m_HasXRefStream = parser.HasXRefStream();
+    m_HasBrokenXRef = parser.HasCorruptedXRefSections();
     m_PrevXRefOffset = parser.GetXRefOffset();
     m_MagicOffset = parser.GetMagicOffset();
     this->SetTrailer(parser.TakeTrailer());
-
-    if (PdfCommon::IsLoggingSeverityEnabled(PdfLogSeverity::Debug))
-    {
-        auto debug = GetTrailer().GetObject().ToString();
-        debug.push_back('\n');
-        PoDoFo::LogMessage(PdfLogSeverity::Debug, debug);
-    }
 
     auto encrypt = parser.GetEncrypt();
     if (encrypt != nullptr)
@@ -183,13 +179,15 @@ void PdfMemDocument::Save(OutputStreamDevice& device, PdfSaveOptions opts)
     try
     {
         writer.Write(device);
-        m_PrevXRefOffset = writer.GetCurrXRefOffset();
     }
     catch (PdfError& e)
     {
         PODOFO_PUSH_FRAME(e);
         throw;
     }
+
+    m_PrevXRefOffset = writer.GetCurrXRefOffset();
+    m_HasBrokenXRef = false;
 }
 
 void PdfMemDocument::SaveUpdate(const string_view& filename, PdfSaveOptions opts)
@@ -225,13 +223,15 @@ void PdfMemDocument::SaveUpdate(OutputStreamDevice& device, PdfSaveOptions opts)
     {
         device.Seek(0, SeekDirection::End);
         writer.Write(device);
-        m_PrevXRefOffset = writer.GetCurrXRefOffset();
     }
     catch (PdfError& e)
     {
         PODOFO_PUSH_FRAME(e);
         throw;
     }
+
+    m_PrevXRefOffset = writer.GetCurrXRefOffset();
+    m_HasBrokenXRef = false;
 }
 
 void PdfMemDocument::beforeWrite(PdfSaveOptions opts)

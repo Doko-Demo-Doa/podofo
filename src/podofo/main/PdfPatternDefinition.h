@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_PATTERN_DEFINITION_H
 #define PDF_PATTERN_DEFINITION_H
@@ -35,6 +32,9 @@ namespace PoDoFo
         virtual ~PdfPatternDefinition();
     private:
         PdfPatternDefinition(nullable<const Matrix&> matrix);
+
+        /// @remarks Deserialization constructor
+        PdfPatternDefinition(const Matrix& matrix);
     public:
         virtual PdfPatternType GetType() const = 0;
         const Matrix& GetMatrix() { return m_Matrix; }
@@ -72,6 +72,10 @@ namespace PoDoFo
         PdfTilingPatternDefinition(PdfTilingSpacingType spacingType, const Rect& bbox,
             double xStep, double yStep, nullable<const Matrix&> matrix);
 
+    protected:
+        /// @remarks Deserialization constructor
+        PdfTilingPatternDefinition(const PdfDictionary& dict);
+
     public:
         PdfPatternType GetType() const override;
 
@@ -93,18 +97,28 @@ namespace PoDoFo
 
     class PODOFO_API PdfColouredTilingPatternDefinition final : public PdfTilingPatternDefinition
     {
+        friend class PdfColouredTilingPattern;
     public:
         PdfColouredTilingPatternDefinition(PdfTilingSpacingType spacingType,
             const Rect& bbox, double xStep, double yStep, nullable<const Matrix&> matrix = { });
+
+    private:
+        /// @remarks Deserialization constructor
+        PdfColouredTilingPatternDefinition(const PdfDictionary& dict);
     public:
         PdfTilingPaintType GetPaintType() const override;
     };
 
     class PODOFO_API PdfUncolouredTilingPatternDefinition final : public PdfTilingPatternDefinition
     {
+        friend class PdfUncolouredTilingPattern;
     public:
         PdfUncolouredTilingPatternDefinition(PdfTilingSpacingType spacingType,
             const Rect& bbox, double xStep, double yStep, nullable<const Matrix&> matrix = { });
+
+    private:
+        /// @remarks Deserialization constructor
+        PdfUncolouredTilingPatternDefinition(const PdfDictionary& dict);
     public:
         PdfTilingPaintType GetPaintType() const override;
     };
@@ -162,21 +176,19 @@ namespace PoDoFo
         bool m_AntiAlias;
     };
 
-    /** Convenience alias for a constant PdfShadingDefinition shared ptr
-     */
+    /// Convenience alias for a constant PdfShadingDefinition shared ptr
     using PdfShadingDefinitionPtr = std::shared_ptr<const PdfShadingDefinition>;
 
     class PODOFO_API PdfShadingPatternDefinition final : public PdfPatternDefinition
     {
+        friend class PdfShadingPattern;
     public:
         PdfShadingPatternDefinition(const PdfShadingDictionary& shading, nullable<const Matrix&> matrix = { },
             nullable<const PdfExtGState&> extGState = { });
 
-        /**
-         * \remarks Deserialization constructor
-         */
-        PdfShadingPatternDefinition(PdfShadingDefinitionPtr&& shading, const Matrix& matrix,
-            PdfExtGStateDefinitionPtr&& extGState);
+    private:
+        /// @remarks Deserialization constructor from dictionary
+        PdfShadingPatternDefinition(const PdfDictionary& dict);
 
     public:
         PdfPatternType GetType() const override;
@@ -205,9 +217,7 @@ namespace PoDoFo
             nullable<const PdfColorRaw&> background = { }, nullable<const Rect&> bbox = { },
             bool antiAlias = false);
 
-        /**
-         * \remarks Deserialization constructor
-         */
+        /// @remarks Deserialization constructor
         PdfFunctionBasedShadingDefinition(PdfColorSpaceFilterPtr&& colorSpace, std::vector<PdfFunctionDefinitionPtr>&& functions,
             const std::array<double, 4>& domain, const Matrix& matrix,
             const PdfColorRaw& background, const Rect& bbox, bool antiAlias);
@@ -230,9 +240,7 @@ namespace PoDoFo
             nullable<const std::array<double, 2>&> domain = { }, nullable<const PdfColorRaw&> background = { },
             nullable<const Rect&> bbox = { }, bool antiAlias = false);
 
-        /**
-         * \remarks Deserialization constructor
-         */
+        /// @remarks Deserialization constructor
         PdfAxialShadingDefinition(PdfColorSpaceFilterPtr&& colorSpace, std::vector<PdfFunctionDefinitionPtr>&& functions,
             const std::array<double, 4>& coords, const std::array<bool, 2>& extend,
             const std::array<double, 2> domain, const PdfColorRaw& background,
@@ -259,9 +267,7 @@ namespace PoDoFo
             nullable<const std::array<double, 2>&> domain = { }, nullable<const PdfColorRaw&> background = { },
             nullable<const Rect&> bbox = { }, bool antiAlias = false);
 
-        /**
-         * \remarks Deserialization constructor 
-         */
+        /// @remarks Deserialization constructor
         PdfRadialShadingDefinition(PdfColorSpaceFilterPtr&& colorSpace, std::vector<PdfFunctionDefinitionPtr>&& functions,
             const std::array<double, 6>& coords, const std::array<bool, 2>& extend,
             const std::array<double, 2>& domain, const PdfColorRaw& background,
@@ -287,9 +293,7 @@ namespace PoDoFo
             PdfFunctionListInitializer&& functions = { }, nullable<const PdfColorRaw&> background = { },
             nullable<const Rect&> bbox = { }, bool antiAlias = false);
 
-        /**
-         * \remarks Deserialization constructor
-         */
+        /// @remarks Deserialization constructor
         PdfFreeFormMeshShadingDefinition(PdfColorSpaceFilterPtr&& colorSpace, std::vector<double>&& decode,
             unsigned bitsPerCoordinate, unsigned bitsPerComponent, unsigned bitsPerFlag,
             std::vector<PdfFunctionDefinitionPtr>&& functions, const PdfColorRaw& background,
@@ -317,9 +321,7 @@ namespace PoDoFo
             PdfFunctionListInitializer&& functions = { }, nullable<const PdfColorRaw&> background = { },
             nullable<const Rect&> bbox = { }, bool antiAlias = false);
 
-        /**
-         * \remarks Deserialization constructor
-         */
+        /// @remarks Deserialization constructor
         PdfLatticeFormMeshShadingDefinition(PdfColorSpaceFilterPtr&& colorSpace, std::vector<double>&& decode,
             unsigned bitsPerCoordinate, unsigned bitsPerComponent, unsigned verticesPerRow,
             std::vector<PdfFunctionDefinitionPtr>&& functions, const PdfColorRaw& background,
@@ -348,9 +350,7 @@ namespace PoDoFo
             PdfFunctionListInitializer&& functions = { }, nullable<const PdfColorRaw&> background = { },
             nullable<const Rect&> bbox = { }, bool antiAlias = false);
 
-        /**
-         * \remarks Deserialization constructor
-         */
+        /// @remarks Deserialization constructor
         PdfCoonsPatchMeshShadingDefinition(PdfColorSpaceFilterPtr&& colorSpace, std::vector<double>&& decode,
             unsigned bitsPerCoordinate, unsigned bitsPerComponent, unsigned bitsPerFlag,
             std::vector<PdfFunctionDefinitionPtr>&& functions, const PdfColorRaw& background,
@@ -378,9 +378,7 @@ namespace PoDoFo
             PdfFunctionListInitializer&& functions = { }, nullable<const PdfColorRaw&> background = { },
             nullable<const Rect&> bbox = { }, bool antiAlias = false);
 
-        /**
-         * \remarks Deserialization constructor
-         */
+        /// @remarks Deserialization constructor
         PdfTensorProductMeshShadingDefinition(PdfColorSpaceFilterPtr&& colorSpace, std::vector<double>&& decode,
             unsigned bitsPerCoordinate, unsigned bitsPerComponent, unsigned bitsPerFlag,
             std::vector<PdfFunctionDefinitionPtr>&& functions, const PdfColorRaw& background,
@@ -401,16 +399,13 @@ namespace PoDoFo
         unsigned m_BitsPerFlag;
     };
 
-    /** Convenience alias for a constant PdfTilingPatternDefinition shared ptr
-     */
+    /// Convenience alias for a constant PdfTilingPatternDefinition shared ptr
     using PdfPatternDefinitionPtr = std::shared_ptr<const PdfPatternDefinition>;
 
-    /** Convenience alias for a constant PdfTilingPatternDefinition shared ptr
-     */
+    /// Convenience alias for a constant PdfTilingPatternDefinition shared ptr
     using PdfTilingPatternDefinitionPtr = std::shared_ptr<const PdfTilingPatternDefinition>;
 
-    /** Convenience alias for a constant PdfShadingPatternDefinition shared ptr
-     */
+    /// Convenience alias for a constant PdfShadingPatternDefinition shared ptr
     using PdfShadingPatternDefinitionPtr = std::shared_ptr<const PdfShadingPatternDefinition>;
 }
 

@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef AUX_NULLABLE_H
 #define AUX_NULLABLE_H
@@ -21,9 +18,7 @@ namespace PoDoFo
             : std::runtime_error("nullable object doesn't have a value") { }
     };
 
-    /**
-     * Alternative to std::optional that supports reference (but not pointer) types
-     */
+    /// Alternative to std::optional that supports reference (but not pointer) types
     template <typename T, typename = std::enable_if_t<!std::is_pointer_v<T>>>
     class nullable final
     {
@@ -98,9 +93,8 @@ namespace PoDoFo
             return *this;
         }
 
-        /** This is same as operator=(T value), but allows
-         * to avoid ambiguities or picking wrong overload
-         */
+        /// This is same as operator=(T value), but allows
+        /// to avoid ambiguities or picking wrong overload
         nullable& operator*=(T value)
         {
             if (m_hasValue)

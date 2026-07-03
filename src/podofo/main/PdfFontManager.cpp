@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2007 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2007 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfFontManager.h"
@@ -48,6 +46,12 @@ static unique_ptr<charbuff> getFontData(const LOGFONTW& inFont);
 static bool getFontData(charbuff& buffer, HDC hdc, HFONT hf);
 static void getFontDataTTC(charbuff& buffer, const charbuff& fileBuffer, const charbuff& ttcBuffer);
 
+#ifdef PODOFO_ENABLE_WIN32GDI_FONT_SEARCH
+
+static unique_ptr<charbuff> getWin32FontData(
+    const string_view& fontName, const PdfFontSearchParams& params);
+
+#endif // PODOFO_ENABLE_WIN32GDI_FONT_SEARCH
 #endif // defined(_WIN32) && defined(PODOFO_HAVE_WIN32GDI)
 
 #if defined(PODOFO_HAVE_FONTCONFIG)
@@ -65,6 +69,7 @@ PdfFontManager::PdfFontManager(PdfDocument& doc)
 void PdfFontManager::Clear()
 {
     m_cachedQueries.clear();
+    m_cachedPaths.clear();
     m_fonts.clear();
 }
 
@@ -321,7 +326,7 @@ void PdfFontManager::AddFontDirectory(const string_view& path)
     auto& fc = GetFontConfigWrapper();
     fc.AddFontDirectory(path);
 #endif
-#if defined(_WIN32) && defined(PODOFO_HAVE_WIN32GDI)
+#if defined(_WIN32) && defined(PODOFO_ENABLE_WIN32GDI_FONT_SEARCH)
     string fontDir(path);
     if (fontDir[fontDir.size() - 1] != '\\')
         fontDir.push_back('\\');
@@ -383,7 +388,7 @@ unique_ptr<const PdfFontMetrics> PdfFontManager::searchFontMetrics(const string_
 
     if (ret == nullptr)
     {
-#if defined(_WIN32) && defined(PODOFO_HAVE_WIN32GDI)
+#if defined(_WIN32) && defined(PODOFO_ENABLE_WIN32GDI_FONT_SEARCH)
         // Try to use WIN32 GDI to find the font
         auto data = getWin32FontData(fontName, params);
         if (data != nullptr)
@@ -416,6 +421,7 @@ void PdfFontManager::EmbedFonts()
     // Clear imported font cache
     // TODO: Don't clean standard14 and full embedded fonts
     m_cachedQueries.clear();
+    m_cachedPaths.clear();
 }
 
 #if defined(_WIN32) && defined(PODOFO_HAVE_WIN32GDI)
@@ -464,8 +470,10 @@ PdfFont& PdfFontManager::GetOrCreateFont(HFONT font, const PdfFontCreateParams& 
     return getOrCreateFontHashed(std::move(metrics), params);
 }
 
+#ifdef PODOFO_ENABLE_WIN32GDI_FONT_SEARCH
+
 // Returned font data is also extracted from collections
-unique_ptr<charbuff> PdfFontManager::getWin32FontData(
+unique_ptr<charbuff> getWin32FontData(
     const string_view& fontName, const PdfFontSearchParams& params)
 {
     u16string fontnamew;
@@ -498,6 +506,7 @@ unique_ptr<charbuff> PdfFontManager::getWin32FontData(
     return ::getFontData(lf);
 }
 
+#endif // PODOFO_ENABLE_WIN32GDI_FONT_SEARCH
 #endif // defined(_WIN32) && defined(PODOFO_HAVE_WIN32GDI)
 
 #ifdef PODOFO_HAVE_FONTCONFIG

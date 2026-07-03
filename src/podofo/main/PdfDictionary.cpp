@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2006 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2006 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfDictionary.h"
@@ -119,7 +117,7 @@ PdfObject& PdfDictionary::addKey(const PdfName& key, PdfObject&& obj)
     else
     {
         // Manually setting dirty on the assigned object will
-        // implicity make this container dirty, but won't make
+        // implicitly make this container dirty, but won't make
         // dirty the moved "obj"
         inserted.first->second.AssignNoDirtySet(std::move(obj));
         inserted.first->second.SetDirty();

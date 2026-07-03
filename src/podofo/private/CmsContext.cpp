@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2023 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2023 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "CmsContext.h"
@@ -89,9 +86,8 @@ void CmsContext::ComputeHashToSign(charbuff& hashToSign)
 
     // Sign with external encryption
     // NOTE: Using openssl code would be CMS_dataFinal(m_cms, m_databio),
-    // but we can't do that since in OpenSSL 1.1 there's not truly
-    // easy way to plug an external encrypion, so we just ripped much
-    // OpenSSL code to accomplish the task
+    // but we can't do that since in OpenSSL 1.1 there's not an
+    // easy way to plug an external encryption so we do it manually
     ssl::ComputeHashToSign(m_signer, m_databio, m_parameters.DoWrapDigest, hashToSign);
     m_status = CmsContextStatus::ComputedHash;
 }
@@ -207,13 +203,17 @@ void CmsContext::Restore(xmlNodePtr ctxElem, charbuff& temp)
     if (m_signer == nullptr)
         goto DeserializationFailed;
 
-    m_cert = sk_X509_value(CMS_get1_certs(m_cms), 0);
-    if (m_cert == nullptr)
+    auto certs = CMS_get1_certs(m_cms);
+    if (certs == nullptr)
         goto DeserializationFailed;
 
-    // Increment the reference count of the certificate,
-    // as it will be freed in the destructor
-    X509_up_ref(m_cert);
+    // Removes the first element and returns it transferring ownership
+    m_cert = sk_X509_shift(certs);
+
+    // Deference all the certificates and release the stack
+    sk_X509_pop_free(certs, X509_free);
+    if (m_cert == nullptr)
+        goto DeserializationFailed;
 
     auto parametersNode = utls::FindChildElement(ctxElem, "Parameters");
     if (node == nullptr)
@@ -352,7 +352,7 @@ void CmsContext::clear()
 
     if (m_databio != nullptr)
     {
-        BIO_free(m_databio);
+        BIO_free_all(m_databio);
         m_databio = nullptr;
     }
 }

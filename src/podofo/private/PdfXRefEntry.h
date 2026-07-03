@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2009 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2009 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #pragma once
 #ifndef PDF_XREF_ENTRY_H
@@ -55,12 +53,11 @@ namespace PoDoFo
     public:
         unsigned GetSize() const;
 
-        /** Resize the internal entries structure in a safe manner, only if needed
-         *  The limit for the maximum number of indirect objects in a PDF file is checked by this method.
-         *  The maximum is 2^23-1 (8.388.607).
-         *
-         *  \param newSize new size of the vector. It's in64_t to detect possible overflows
-         */
+        /// Resize the internal entries structure in a safe manner, only if needed
+        /// The limit for the maximum number of indirect objects in a PDF file is checked by this method.
+        /// The maximum is 2^23-1 (8.388.607).
+        ///
+        /// @param newSize new size of the vector. It's in64_t to detect possible overflows
         void Enlarge(unsigned newSize);
         void Clear();
         PdfXRefEntry& operator[](unsigned index);

@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfXMPPacket.h"
@@ -112,7 +109,7 @@ PdfMetadataStore PdfXMPPacket::GetMetadata() const
 {
     if (m_Description == nullptr)
     {
-        // The the XMP metadata is missing or has insufficient data
+        // The XMP metadata is missing or has insufficient data
         // to determine a PDF/A level
         return { };
     }

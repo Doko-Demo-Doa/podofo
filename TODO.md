@@ -1,8 +1,6 @@
-### 1.1
-- Complete the LGPLv2+/MPL-2.0 relicensing
-- Throw by default when signing a document with invalid XRef sections
-
 ### After 1.1
+- PdfPredictorDecoder: Support BitsPerComponent != 8
+- PdfColorSpaceFilterIndexed::GetSourceScanLineSize() handle bitsPerComponent != 8
 - Cleanup PdfTreeNode
 - Add subsetting of PdfDifferenceEncoding
 - PdfDifferenceList: Validate insertion for the public Add methods (like for example enforce "Adobe Glyph List For New Fonts")
@@ -34,8 +32,6 @@
 - PdfMemDocument: Prevent Save() operation after signing operation
 - PdfMemDocument: Evaluate release the device after all objects have been loaded (eg. after a full Save())
 - PdfParserObject: Evaluate release the device after loading
-- Review all page import functions to check correct working/improve the code
-  (PdfPageCollection::AppendDocumentPages(), PdfPageCollection::InsertDocumentPageAt())
 - PdfElement: Optimize, keep dictionary/array pointer. Evaluate Add shared_ptr PdfElement::GetObjectPtr() 
 - Check what do with tools/restore manuals
 - Fix/complete handling of text extraction in rotated pages (??? Done?)

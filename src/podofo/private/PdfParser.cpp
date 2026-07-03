@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2005 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2005 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include "PdfDeclarationsPrivate.h"
 #include "PdfParser.h"
@@ -52,6 +50,7 @@ void PdfParser::init()
 {
     m_PdfVersion = PdfVersion::Unknown;
     m_HasXRefStream = false;
+    m_HasCorruptedXRefSections = false;
     m_MagicOffset = 0;
     m_StartXRefTokenPos = 0;
     m_XRefOffset = 0; // 0 is a sentinel for invalid XRef offset
@@ -83,6 +82,8 @@ void PdfParser::Parse(InputStreamDevice& device)
         {
             throw;
         }
+
+        m_HasCorruptedXRefSections = true;
     }
 
     if (m_LoadStreamsEagerly)
@@ -362,9 +363,9 @@ void PdfParser::mergeTrailer(const PdfObject& trailer)
         m_Trailer->GetDictionary().AddKey("ID"_n, *obj);
 }
 
-void PdfParser::readNextTrailer(InputStreamDevice& device, bool skipFollowPrevious)
+void PdfParser::readNextTrailer(InputStreamDevice& device, nullable<size_t>& prevOffset)
 {
-    utls::RecursionGuard guard;
+    prevOffset = nullptr;
     string_view token;
     if (!m_tokenizer.TryReadNextToken(device, token) || token != "trailer")
         PODOFO_RAISE_ERROR(PdfErrorCode::InvalidTrailer);
@@ -388,10 +389,17 @@ void PdfParser::readNextTrailer(InputStreamDevice& device, bool skipFollowPrevio
     if (trailerPtr->GetDictionary().TryFindKeyAs<int64_t>("XRefStm", xrefStmOffset))
     {
         // The trailer is hybrid-reference file's trailer with a
-        // separate XRef stream: just read it
+        // separate XRef stream: just read it. Note that we shall
+        // not follow a /Prev entry in the XRef stream. ISO 32000-2:2020 says in
+        // 7.5.8.4 Compatibility with applications that do not support compressed
+        // reference streams "...the search shall proceed to a cross-reference
+        // stream specified by the XRefStm entry before looking in the previous
+        // cross-reference section (the Prev entry in the trailer)", implying that
+        // the legacy one cross-reference table drives the revision chain
         try
         {
-            ReadXRefStreamContents(device, static_cast<size_t>(xrefStmOffset), skipFollowPrevious);
+            nullable<size_t> xrefStmPrevOffset;
+            ReadXRefStreamContents(device, static_cast<size_t>(xrefStmOffset), xrefStmPrevOffset);
         }
         catch (PdfError& e)
         {
@@ -406,20 +414,9 @@ void PdfParser::readNextTrailer(InputStreamDevice& device, bool skipFollowPrevio
     {
         if (offset > 0)
         {
-            // Whenever we read a Prev key, 
-            // we know that the file was updated.
-            m_IncrementalUpdateCount++;
-
-            // Fix the offset with the magic offset
-            offset += m_MagicOffset;
-            if (!skipFollowPrevious)
-            {
-                if (m_visitedXRefOffsets.find((size_t)offset) == m_visitedXRefOffsets.end())
-                    ReadXRefContents(device, (size_t)offset, false);
-                else
-                    PoDoFo::LogMessage(PdfLogSeverity::Warning, "XRef contents at offset {} requested twice, skipping the second read",
-                        static_cast<int64_t>(offset));
-            }
+            // Fix the offset with the magic offset and return it to the caller,
+            // which follows the /Prev chain iteratively
+            prevOffset = static_cast<size_t>(offset + m_MagicOffset);
         }
         else
         {
@@ -430,91 +427,117 @@ void PdfParser::readNextTrailer(InputStreamDevice& device, bool skipFollowPrevio
 
 void PdfParser::ReadXRefContents(InputStreamDevice& device, size_t offset, bool skipFollowPrevious)
 {
-    utls::RecursionGuard guard;
-
     int64_t firstObject = 0;
     int64_t objectCount = 0;
 
-    if (m_visitedXRefOffsets.find(offset) != m_visitedXRefOffsets.end())
+    while (true)
     {
-        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidXRef,
-            "Cycle in xref structure. Offset {} already visited", offset);
-    }
-    else
-    {
-        m_visitedXRefOffsets.insert(offset);
-    }
+        if (m_visitedXRefOffsets.find(offset) != m_visitedXRefOffsets.end())
+        {
+            PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidXRef,
+                "Cycle in xref structure. Offset {} already visited", offset);
+        }
+        else
+        {
+            m_visitedXRefOffsets.insert(offset);
+        }
 
-    size_t currPosition = device.GetPosition();
-    device.Seek(0, SeekDirection::End);
-    size_t fileSize = device.GetPosition();
-    device.Seek(currPosition, SeekDirection::Begin);
+        size_t currPosition = device.GetPosition();
+        device.Seek(0, SeekDirection::End);
+        size_t fileSize = device.GetPosition();
+        device.Seek(currPosition, SeekDirection::Begin);
 
-    if (offset > fileSize)
-    {
-        // Invalid "startxref". If we haven't read any XRef section yet,
-        // try to find a legacy "xref" table
-        if (m_IncrementalUpdateCount != 0 || !tryFindTokenBackward(device, "xref", m_StartXRefTokenPos))
-            PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidXRef, "Invalid \"startxref\" offset");
+        bool isXRefStream = false;
+        if (offset > fileSize)
+        {
+            // Invalid "startxref". If we haven't read any XRef section yet,
+            // try to find a legacy "xref" table
+            if (m_IncrementalUpdateCount != 0 || !tryFindTokenBackward(device, "xref", m_StartXRefTokenPos))
+                PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidXRef, "Invalid \"startxref\" offset");
 
-        offset = device.GetPosition() - char_traits<char>::length("xref");
-        m_XRefOffset = offset;
-    }
-    else
-    {
-        device.Seek(offset);
-        string_view token;
-        if (!m_tokenizer.TryReadNextToken(device, token))
-            PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidXRef, "Invalid \"startxref\" offset");
+            offset = device.GetPosition() - char_traits<char>::length("xref");
+            m_XRefOffset = offset;
+        }
+        else
+        {
+            device.Seek(offset);
+            string_view token;
+            if (!m_tokenizer.TryReadNextToken(device, token))
+                PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidXRef, "Invalid \"startxref\" offset");
 
-        if (token != "xref")
+            if (token != "xref")
+                isXRefStream = true;
+        }
+
+        nullable<size_t> prevOffset;
+        if (isXRefStream)
         {
             // Try to read a XRef stream instead
-            ReadXRefStreamContents(device, offset, skipFollowPrevious);
+            ReadXRefStreamContents(device, offset, prevOffset);
             m_HasXRefStream = true;
-            return;
         }
-    }
-
-    // It's a "xref" table, read all subsections
-    string_view token;
-    for (unsigned xrefSectionCount = 0; ; xrefSectionCount++)
-    {
-        if (xrefSectionCount == MAX_XREF_SESSION_COUNT)
-            PODOFO_RAISE_ERROR(PdfErrorCode::InvalidEOFToken);
-
-        try
+        else
         {
-            if (!m_tokenizer.TryPeekNextToken(device, token))
-                PODOFO_RAISE_ERROR(PdfErrorCode::InvalidXRef);
+            // It's a "xref" table, read all subsections
+            string_view token;
+            for (unsigned xrefSectionCount = 0; ; xrefSectionCount++)
+            {
+                if (xrefSectionCount == MAX_XREF_SESSION_COUNT)
+                    PODOFO_RAISE_ERROR(PdfErrorCode::InvalidEOFToken);
 
-            if (token == "trailer")
-                break;
+                try
+                {
+                    if (!m_tokenizer.TryPeekNextToken(device, token))
+                        PODOFO_RAISE_ERROR(PdfErrorCode::InvalidXRef);
 
-            firstObject = m_tokenizer.ReadNextNumber(device);
-            objectCount = m_tokenizer.ReadNextNumber(device);
+                    if (token == "trailer")
+                        break;
+
+                    firstObject = m_tokenizer.ReadNextNumber(device);
+                    objectCount = m_tokenizer.ReadNextNumber(device);
 
 #ifdef PODOFO_VERBOSE_DEBUG
-            PoDoFo::LogMessage(PdfLogSeverity::Debug, "Reading numbers: {} {}", firstObject, objectCount);
+                    PoDoFo::LogMessage(PdfLogSeverity::Debug, "Reading numbers: {} {}", firstObject, objectCount);
 #endif // PODOFO_VERBOSE_DEBUG
 
-            ReadXRefSubsection(device, firstObject, objectCount);
-        }
-        catch (PdfError& e)
-        {
-            if (e == PdfErrorCode::InvalidNumber || e == PdfErrorCode::InvalidXRef || e == PdfErrorCode::UnexpectedEOF)
-            {
-                break;
+                    ReadXRefSubsection(device, firstObject, objectCount);
+                }
+                catch (PdfError& e)
+                {
+                    if (e == PdfErrorCode::InvalidNumber || e == PdfErrorCode::InvalidXRef || e == PdfErrorCode::UnexpectedEOF)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        PODOFO_PUSH_FRAME(e);
+                        throw;
+                    }
+                }
             }
-            else
-            {
-                PODOFO_PUSH_FRAME(e);
-                throw;
-            }
-        }
-    }
 
-    readNextTrailer(device, skipFollowPrevious);
+            readNextTrailer(device, prevOffset);
+        }
+
+        if (prevOffset == nullptr)
+            break;
+
+        // Whenever we detect a /Prev key we know that the file was updated,
+        // even if we are not going to follow it
+        m_IncrementalUpdateCount++;
+
+        if (skipFollowPrevious)
+            break;
+
+        if (m_visitedXRefOffsets.find(*prevOffset) != m_visitedXRefOffsets.end())
+        {
+            PoDoFo::LogMessage(PdfLogSeverity::Warning, "XRef contents at offset {} requested twice, skipping the second read",
+                static_cast<int64_t>(*prevOffset));
+            break;
+        }
+
+        offset = *prevOffset;
+    }
 }
 
 bool CheckEOL(char e1, char e2)
@@ -616,7 +639,7 @@ void PdfParser::ReadXRefSubsection(InputStreamDevice& device, int64_t& firstObje
                 }
                 default:
                 {
-                    // This flow should have beeb already been cathed earlier
+                    // This flow should have been already been caught earlier
                     PODOFO_ASSERT(false);
                 }
             }
@@ -636,9 +659,9 @@ void PdfParser::ReadXRefSubsection(InputStreamDevice& device, int64_t& firstObje
     }
 }
 
-void PdfParser::ReadXRefStreamContents(InputStreamDevice& device, size_t offset, bool skipFollowPrevious)
+void PdfParser::ReadXRefStreamContents(InputStreamDevice& device, size_t offset, nullable<size_t>& prevOffset)
 {
-    utls::RecursionGuard guard;
+    prevOffset = nullptr;
 
     device.Seek(offset);
     auto xrefObjTrailer = new PdfXRefStreamParserObject(m_Objects->GetDocument(), device, m_entries);
@@ -666,20 +689,12 @@ void PdfParser::ReadXRefStreamContents(InputStreamDevice& device, size_t offset,
 
     xrefObjTrailer->ReadXRefTable();
 
-    // Check for a previous XRefStm or xref table
+    // Check for a previous XRefStm or xref table and return it to the caller,
+    // which follows the /Prev chain iteratively. A self-reference is reported
+    // as no previous offset to avoid an immediate loop
     size_t previousOffset;
     if (xrefObjTrailer->TryGetPreviousOffset(previousOffset) && previousOffset != offset)
-    {
-        m_IncrementalUpdateCount++;
-
-        if (!skipFollowPrevious)
-        {
-            // PDFs that have been through multiple PDF tools may have a mix of xref tables (ISO 32000-1 7.5.4) 
-            // and XRefStm streams (ISO 32000-1 7.5.8.1) and in the Prev chain, 
-            // so call ReadXRefContents (which deals with both) instead of ReadXRefStreamContents 
-            ReadXRefContents(device, previousOffset, false);
-        }
-    }
+        prevOffset = previousOffset;
 }
 
 void PdfParser::ReadObjectEntries(InputStreamDevice& device)

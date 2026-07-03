@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_CID_TO_GID_MAP_H
 #define PDF_CID_TO_GID_MAP_H
@@ -12,14 +9,12 @@
 
 namespace PoDoFo
 {
-    /** A backing storage for a CID to GID map
-     * \remarks It must preserve ordering
-     */
+    /// A backing storage for a CID to GID map
+    /// @remarks It must preserve ordering
     using CIDToGIDMap = std::map<unsigned, unsigned>;
 
-    /** Helper class to handle the /CIDToGIDMap entry in a Type2 CID font
-     * or /TrueType fonts implicit CID to GID mapping
-     */
+    /// Helper class to handle the /CIDToGIDMap entry in a Type2 CID font
+    /// or /TrueType fonts implicit CID to GID mapping
     class PdfCIDToGIDMap final
     {
     public:

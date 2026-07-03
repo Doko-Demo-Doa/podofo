@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_CONTENT_READER_H
 #define PDF_CONTENT_READER_H
@@ -16,8 +13,7 @@
 
 namespace PoDoFo {
 
-/** Type of the content read from a content stream
- */
+/// Type of the content read from a content stream
 enum class PdfContentType : uint8_t
 {
     Unknown = 0,
@@ -44,10 +40,10 @@ enum class PdfContentErrors : uint16_t
     None = 0,
     InvalidOperator = 1,                ///< Unknown operator or insufficient operand count. Applies to Operator
     InvalidXObject = 2,                 ///< Invalid or not found XObject
+    UnexpectedToken = 4,                ///< Token encountered in an invalid context (e.g., misplaced PostScript brace delimiter '{' or '}')
 };
 
-/** Content as read from content streams
- */
+/// Content as read from content streams
 class PODOFO_API PdfContent final
 {
     friend class PdfContentStreamReader;
@@ -79,20 +75,16 @@ public:
     PdfContentWarnings GetWarnings() const { return Warnings; }
     PdfContentErrors GetErrors() const { return Errors; }
 
-    /** Unchecked access to content data 
-     */
+    /// Unchecked access to content data
     const Data& operator*() const { return Data; }
 
-    /** Unchecked and mutable access to content data
-     */
+    /// Unchecked and mutable access to content data
     Data& operator*() { return Data; }
 
-    /** Unchecked access to content data
-     */
+    /// Unchecked access to content data
     const Data* operator->() const { return &Data; }
 
-    /** Unchecked and mutable access to content data
-     */
+    /// Unchecked and mutable access to content data
     Data* operator->() { return &Data; }
 
 private:
@@ -115,10 +107,9 @@ enum class PdfContentReaderFlags
     SkipFetchInlineImages = 8,      ///< Don't fetch inline images data, just skip it
 };
 
-/** Custom handler for inline images
- * \param imageDict dictionary for the inline image
- * \returns false if EOF 
- */
+/// Custom handler for inline images
+/// @param imageDict dictionary for the inline image
+/// @returns false if EOF
 using PdfInlineImageHandler = std::function<bool(const PdfDictionary& imageDict, InputStreamDevice& device)>;
 
 struct PODOFO_API PdfContentReaderArgs final
@@ -127,8 +118,7 @@ struct PODOFO_API PdfContentReaderArgs final
     PdfInlineImageHandler InlineImageHandler;
 };
 
-/** Reader class to read content streams
- */
+/// Reader class to read content streams
 class PODOFO_API PdfContentStreamReader final
 {
 public:

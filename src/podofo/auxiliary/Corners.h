@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2025 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2025 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef AUX_CORNERS_H
 #define AUX_CORNERS_H
@@ -14,8 +11,7 @@ namespace PoDoFo {
 class PdfArray;
 class Rect;
 
-/** An unoriented rectangle defined by 2 points
- */
+/// An unoriented rectangle defined by 2 points
 class PODOFO_API Corners final
 {
 public:
@@ -25,12 +21,10 @@ public:
     double Y2;
 
 public:
-    /** Create an empty rectangle
-     */
+    /// Create an empty rectangle
     Corners();
 
-    /** Create a rectangle from 2 points
-     */
+    /// Create a rectangle from 2 points
     Corners(double x1, double y1, double x2, double y2);
 
     Corners(const Corners& rhs) = default;
@@ -38,9 +32,8 @@ public:
 public:
     static Corners FromCorners(const Vector2& corner1, const Vector2& corner2);
 
-    /** Create a Corners instance from a the 4 values in the array
-     *  \param arr the array to load the values from
-     */
+    /// Create a Corners instance from a the 4 values in the array
+    /// @param arr the array to load the values from
     static Corners FromArray(const PdfArray& arr);
 
     Vector2 GetCorner1() const;
@@ -51,12 +44,10 @@ public:
 
     double GetHeight() const;
 
-    /** Get the normalized rectangle defined by position (left-bottom) and size
-     */
+    /// Get the normalized rectangle defined by position (left-bottom) and size
     Rect GetNormalized() const;
 
-    /** Converts the rectangle into an array
-     */
+    /// Converts the rectangle into an array
     void ToArray(PdfArray& arr) const;
     PdfArray ToArray() const;
 

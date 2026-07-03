@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfCharCodeMap.h"
@@ -259,7 +256,7 @@ void PdfCharCodeMap::PushRange(const PdfCharCode& srcCodeLo, unsigned rangeSize,
             invalidRanges = true;
             auto node = m_Ranges.extract(inserted.first);
             node.value().Size = rangeSize;
-            // NOTE: The second atBegin evaulation is needed because
+            // NOTE: The second atBegin evaluation is needed because
             // the iterator can be invalidated after the extraction
             // when the node being updated is the first element
             if (atBegin)
@@ -285,7 +282,7 @@ void PdfCharCodeMap::PushRange(const PdfCharCode& srcCodeLo, unsigned rangeSize,
 
 bool PdfCharCodeMap::TryGetCodePoints(const PdfCharCode& codeUnit, CodePointSpan& codePoints) const
 {
-    // Try to find direct mapppings first
+    // Try to find direct mappings first
     auto found = m_Mappings.find(codeUnit);
     if (found != m_Mappings.end())
     {

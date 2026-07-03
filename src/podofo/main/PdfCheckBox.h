@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2007 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2007 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_CHECKBOX_H
 #define PDF_CHECKBOX_H
@@ -12,8 +10,7 @@
 
 namespace PoDoFo
 {
-    /** A checkbox can be checked or unchecked by the user
-     */
+    /// A checkbox can be checked or unchecked by the user
     class PODOFO_API PdfCheckBox final : public PdfToggleButton
     {
         friend class PdfField;

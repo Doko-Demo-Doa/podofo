@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2005 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2005 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_EXTGSTATE_H
 #define PDF_EXTGSTATE_H
@@ -14,23 +12,21 @@ namespace PoDoFo {
 
 class PdfGraphicsStateWrapper;
 
-/** This class wraps the ExtGState object used in the Resource
- *  Dictionary of a Content-supporting element (page, Pattern, etc.)
- *  The main usage is for transparency, but it also support a variety
- *  of prepress features.
- */
+/// This class wraps the ExtGState object used in the Resource
+/// Dictionary of a Content-supporting element (page, Pattern, etc.)
+/// The main usage is for transparency, but it also support a variety
+/// of prepress features.
 class PODOFO_API PdfExtGState final : public PdfDictionaryElement
 {
     friend class PdfDocument;
     friend class PdfGraphicsStateWrapper;
 
 private:
-    /** Create a new PdfExtGState object which will introduce itself
-     *  automatically to every page object it is used on.
-     *
-     *  \param parent parent document
-     *
-     */
+    /// Create a new PdfExtGState object which will introduce itself
+    /// automatically to every page object it is used on.
+    ///
+    /// @param doc parent document
+    ///
     PdfExtGState(PdfDocument& doc, PdfExtGStateDefinitionPtr&& filter);
 
 public:

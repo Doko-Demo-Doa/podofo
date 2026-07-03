@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2023 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2023 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef CMS_CONTEXT_H
 #define CMS_CONTEXT_H
@@ -36,8 +33,7 @@ namespace PoDoFo
         nullable<std::chrono::seconds> SigningTimeUTC;
     };
 
-    /** This class computes a CMS signature according to RFC 5652
-     */
+    /// This class computes a CMS signature according to RFC 5652
     class CmsContext final
     {
     public:

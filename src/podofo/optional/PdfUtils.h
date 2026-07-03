@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_UTILS_H
 #define PDF_UTILS_H
@@ -92,16 +89,14 @@ namespace PoDoFo
         }
     }
 
-    /** Checks if a character is neither whitespace or delimiter
-     */
+    /// Checks if a character is neither whitespace or delimiter
     inline bool IsCharRegular(char ch)
     {
         return !(IsCharWhitespace(ch) || IsCharDelimiter(ch));
     }
 
-    /** Check if the character is within the range of
-     * non control code ASCII characters
-     */
+    /// Check if the character is within the range of
+    /// non control code ASCII characters
     inline bool IsCharASCIIPrintable(char ch)
     {
         return ch > 32 && ch < 127;

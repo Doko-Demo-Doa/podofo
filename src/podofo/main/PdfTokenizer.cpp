@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2006 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2006 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfTokenizer.h"
@@ -632,7 +630,7 @@ void PdfTokenizer::ReadString(InputStreamDevice& device, PdfVariant& variant, co
         }
     }
 
-    // In case the string ends with a octal escape sequence
+    // In case the string ends with an octal escape sequence
     if (octEscape)
         m_charBuffer.push_back(octValue);
 

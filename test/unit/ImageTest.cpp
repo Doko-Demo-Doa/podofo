@@ -1,15 +1,13 @@
-/**
- * Copyright (C) 2008 by Dominik Seichter <domseichter@web.de>
- * Copyright (C) 2021 by Francesco Pretto <ceztko@gmail.com>
- *
- * Licensed under GNU Library General Public 2.0 or later.
- * Some rights reserved. See COPYING, AUTHORS.
- */
+// SPDX-FileCopyrightText: 2008 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: MIT-0
 
 #include <PdfTest.h>
 
 using namespace std;
 using namespace PoDoFo;
+
+#include <podofo/private/OpenSSLInternal.h>
 
 TEST_CASE("TestImage1")
 {
@@ -84,9 +82,10 @@ static void testReferenceImage(const PdfDocument& doc)
         TestUtils::ReadTestInputFile("ReferenceImage.ppm", expectedImage);
 
         REQUIRE(ppmbuffer == expectedImage);
-
-        break;
+        return;
     }
+
+    FAIL("Reference image not found");
 }
 
 TEST_CASE("TestImage3")
@@ -109,6 +108,14 @@ TEST_CASE("TestImage3")
         doc.Load(outputFile);
         testReferenceImage(doc);
     }
+}
+
+TEST_CASE("TestImageInvalidLength")
+{
+    auto inputFile = TestUtils::GetTestInputFilePath("TestImageInvalidLength.pdf");
+    PdfMemDocument doc;
+    doc.Load(inputFile);
+    testReferenceImage(doc);
 }
 
 TEST_CASE("TestImage4")
@@ -275,4 +282,82 @@ TEST_CASE("TestImage8")
 
     painter.FinishDrawing();
     doc.Save(outputFile);
+}
+
+TEST_CASE("TestImage9")
+{
+    PdfMemDocument doc;
+    doc.Load(TestUtils::GetTestInputFilePath("TestIndexedRGB.pdf"));
+
+    auto& obj = doc.GetObjects().MustGetObject(PdfReference(27, 0));
+    unique_ptr<PdfImage> image;
+    REQUIRE(PdfXObject::TryCreateFromObject<PdfImage>(obj, image));
+
+    charbuff buffer;
+    image->DecodeTo(buffer, PdfPixelFormat::BGRA);
+    charbuff ppmbuffer;
+    TestUtils::SaveFramePPM(ppmbuffer, buffer.data(),
+        PdfPixelFormat::BGRA, image->GetWidth(), image->GetHeight());
+
+    REQUIRE(ssl::ComputeMD5Str(buffer) == "87A5BA219A8429733A1704044617F331");
+}
+
+TEST_CASE("TestImage10")
+{
+    PdfMemDocument doc;
+    doc.Load(TestUtils::GetTestInputFilePath("TestIndexedRGB_OutOfPalette.pdf"));
+
+    auto& obj = doc.GetObjects().MustGetObject(PdfReference(20, 0));
+    unique_ptr<PdfImage> image;
+    REQUIRE(PdfXObject::TryCreateFromObject<PdfImage>(obj, image));
+
+    charbuff buffer;
+    image->DecodeTo(buffer, PdfPixelFormat::BGRA);
+    charbuff ppmbuffer;
+    TestUtils::SaveFramePPM(ppmbuffer, buffer.data(),
+        PdfPixelFormat::BGRA, image->GetWidth(), image->GetHeight());
+
+    REQUIRE(ssl::ComputeMD5Str(buffer) == "2548A8F48BC5FC9521D689239259AC48");
+}
+
+TEST_CASE("TestImage11")
+{
+    PdfMemDocument doc;
+    doc.Load(TestUtils::GetTestInputFilePath("TestImageSeparation.pdf"));
+    auto& page = doc.GetPages().GetPageAt(0);
+    auto& resources = page.GetResources();
+    auto imageObj = resources.GetResource(PdfResourceType::XObject, "R17");
+    unique_ptr<PdfImage> image;
+    REQUIRE(PdfXObject::TryCreateFromObject<PdfImage>(*imageObj, image));
+
+    charbuff buffer;
+    image->DecodeTo(buffer, PdfPixelFormat::BGRA);
+    charbuff ppmbuffer;
+    TestUtils::SaveFramePPM(ppmbuffer, buffer.data(),
+        PdfPixelFormat::BGRA, image->GetWidth(), image->GetHeight());
+
+    auto outputFile = TestUtils::GetTestOutputFilePath("TestImage11.ppm");
+    utls::WriteTo(outputFile, ppmbuffer);
+
+    REQUIRE(image->GetWidth() == 367);
+    REQUIRE(image->GetHeight() == 367);
+    REQUIRE(ssl::ComputeMD5Str(buffer) == "5A8439C551C2772A70722843F0DCEF31");
+}
+
+TEST_CASE("TestBitsPerComponent1")
+{
+    PdfMemDocument doc;
+    doc.Load(TestUtils::GetTestInputFilePath("TestBitsPerComponent1.pdf"));
+
+    auto& obj = doc.GetObjects().MustGetObject(PdfReference(27, 0));
+    unique_ptr<PdfImage> image;
+    REQUIRE(PdfXObject::TryCreateFromObject<PdfImage>(obj, image));
+
+    charbuff buffer;
+    image->DecodeTo(buffer, PdfPixelFormat::BGRA);
+    charbuff ppmbuffer;
+    TestUtils::SaveFramePPM(ppmbuffer, buffer.data(),
+        PdfPixelFormat::BGRA, image->GetWidth(), image->GetHeight());
+
+    REQUIRE(ssl::ComputeMD5Str(buffer) == "C7C13471D8E5CF9E48637513D73FDCB5");
 }

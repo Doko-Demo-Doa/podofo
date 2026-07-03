@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_CONTENT_STREAM_OPERATORS_H
 #define PDF_CONTENT_STREAM_OPERATORS_H
@@ -13,10 +10,8 @@
 
 namespace PoDoFo
 {
-/**
- * Pdf content stream callble operator interface
- * ISO 32000 - 1:2008 "A.2 PDF Content Stream Operators"
- */
+/// Pdf content stream callble operator interface
+/// ISO 32000 - 1:2008 "A.2 PDF Content Stream Operators"
 // TODO: Add missing operators
 class PODOFO_API PdfContentStreamOperators
 {

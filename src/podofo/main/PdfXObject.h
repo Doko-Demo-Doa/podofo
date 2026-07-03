@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2006 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2006 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_XOBJECT_H
 #define PDF_XOBJECT_H
@@ -19,14 +17,13 @@ class PdfXObjectForm;
 class PdfXObjectPostScript;
 class PdfAnnotation;
 
-/** A XObject is a content stream with several drawing commands and data
- *  which can be used throughout a PDF document.
- *
- *  You can draw on a XObject like you would draw onto a page and can draw
- *  this XObject later again using a PdfPainter.
- *
- *  \see PdfPainter
- */
+/// A XObject is a content stream with several drawing commands and data
+/// which can be used throughout a PDF document.
+///
+/// You can draw on a XObject like you would draw onto a page and can draw
+/// this XObject later again using a PdfPainter.
+///
+/// @see PdfPainter
 class PODOFO_API PdfXObject : public PdfDictionaryElement
 {
     friend class PdfXObjectForm;
@@ -57,16 +54,19 @@ public:
     inline PdfXObjectType GetType() const { return m_Type; }
 
 protected:
-    virtual const PdfXObjectForm* GetForm() const;
+    virtual PdfXObjectForm* getForm() const;
 
 private:
     // To be called from PdfContentStreamReader
     static std::unique_ptr<PdfXObject> CreateFromObject(const PdfObject& obj, PdfXObjectType reqType, PdfXObjectType& detectedType);
 
     static PdfXObject* createFromObject(const PdfObject& obj, PdfXObjectType reqType, PdfXObjectType& detectedType);
-    static PdfXObjectType getPdfXObjectType(const PdfObject& obj);
     template <typename TXObject>
     static constexpr PdfXObjectType GetXObjectType();
+
+    PdfXObjectForm* GetForm() { return getForm(); }
+
+    const PdfXObjectForm* GetForm() const { return getForm(); }
 
 private:
     PdfXObjectType m_Type;

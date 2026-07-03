@@ -1,10 +1,6 @@
-/**
- * Copyright (C) 2008 by Dominik Seichter <domseichter@web.de>
- * Copyright (C) 2021 by Francesco Pretto <ceztko@gmail.com>
- *
- * Licensed under GNU Library General Public 2.0 or later.
- * Some rights reserved. See COPYING, AUTHORS.
- */
+// SPDX-FileCopyrightText: 2008 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: MIT-0
 
 #include <PdfTest.h>
 
@@ -116,4 +112,143 @@ TEST_CASE("TextExtraction5")
     REQUIRE(entries[3].Text == "Para 2, Line 2");
     ASSERT_EQUAL(entries[3].X, 10.0);
     ASSERT_EQUAL(entries[3].Y, 46.0);
+}
+
+TEST_CASE("TextExtractionAllRotations")
+{
+    PdfMemDocument doc;
+    doc.Load(TestUtils::GetTestInputFilePath("TextExtractionAllRotations.pdf"));
+
+    struct ExpectedEntry
+    {
+        double X;
+        double Y;
+        Rect BoundingBox;
+    };
+
+    // One "HelloWorld" entry per page, each page using a different page rotation
+    const ExpectedEntry expected[] = {
+        { 71.832,  772.534,  Rect(71.832,  768.214,  58.08, 16.188) },
+        { 81.8325, 515.2705, Rect(81.8325, 510.9505, 58.08, 16.188) },
+        { 91.8325, 751.8565, Rect(91.8325, 747.5365, 58.08, 16.188) },
+        { 101.8325, 495.2705, Rect(101.8325, 490.9505, 58.08, 16.188) },
+    };
+
+    REQUIRE(doc.GetPages().GetCount() == std::size(expected));
+
+    for (unsigned i = 0; i < doc.GetPages().GetCount(); i++)
+    {
+        auto& page = doc.GetPages().GetPageAt(i);
+        vector<PdfTextEntry> entries;
+        PdfTextExtractParams params = {};
+        params.Flags = PdfTextExtractFlags::ComputeBoundingBox;
+        page.ExtractTextTo(entries, params);
+
+        REQUIRE(entries.size() == 1);
+        auto& entry = entries[0];
+        REQUIRE(entry.Text == "HelloWorld");
+        ASSERT_EQUAL(entry.X, expected[i].X);
+        ASSERT_EQUAL(entry.Y, expected[i].Y);
+        REQUIRE(entry.BoundingBox.has_value());
+        auto& bbox = *entry.BoundingBox;
+        ASSERT_EQUAL(bbox.X, expected[i].BoundingBox.X);
+        ASSERT_EQUAL(bbox.Y, expected[i].BoundingBox.Y);
+        ASSERT_EQUAL(bbox.Width, expected[i].BoundingBox.Width);
+        ASSERT_EQUAL(bbox.Height, expected[i].BoundingBox.Height);
+
+        // The painter aligns supplied coordinates to the canonical frame by default,
+        // so the extracted bounding box can be drawn directly on rotated pages
+        PdfPainter painter;
+        painter.SetCanvas(page);
+        painter.GraphicsState.SetStrokingColor(PdfColor(1.0, 0.0, 0.0));
+        painter.DrawRectangle(bbox, PdfPathDrawMode::Stroke);
+        painter.FinishDrawing();
+    }
+
+    doc.Save(TestUtils::GetTestOutputFilePath("TextExtractionAllRotations.pdf"));
+
+    // Verify full content streams after painting the bounding boxes
+    auto getContents = [](const PdfPage& pg)
+    {
+        PdfCanvasInputDevice input(pg);
+        string ret;
+        StringStreamDevice output(ret);
+        input.CopyTo(output);
+        return ret;
+    };
+
+    REQUIRE(getContents(doc.GetPages().GetPageAt(0)) ==
+R"(q
+BT
+/C0_0 12 Tf
+71.832 772.534 Td
+<00290046004d004d0050>Tj
+1 0 0 rg
+<003800500053004d0045>Tj
+ET
+
+Q
+q
+1 0 0 RG
+71.832 768.214 58.08 16.188 re
+S
+Q
+)");
+
+    REQUIRE(getContents(doc.GetPages().GetPageAt(1)) ==
+R"(q
+BT
+/C0_0 12 Tf
+0 1 -1 0 80.0335 81.8325 Tm
+<00290046004d004d0050>Tj
+1 0 0 rg
+<003800500053004d0045>Tj
+ET
+
+Q
+q
+0 1 -1 0 595.304 -0 cm
+1 0 0 RG
+81.8325 510.9505 58.08 16.188 re
+S
+Q
+)");
+
+    REQUIRE(getContents(doc.GetPages().GetPageAt(2)) ==
+R"(q
+BT
+/C0_0 12 Tf
+-1 0 0 -1 503.4715 90.0335 Tm
+<00290046004d004d0050>Tj
+1 0 0 rg
+<003800500053004d0045>Tj
+ET
+
+Q
+q
+-1 0 -0 -1 595.304 841.89 cm
+1 0 0 RG
+91.8325 747.5365 58.08 16.188 re
+S
+Q
+)");
+
+    REQUIRE(getContents(doc.GetPages().GetPageAt(3)) ==
+R"(q
+BT
+/C0_0 12 Tf
+0 -1 1 0 495.2705 740.0575 Tm
+<00290046004d004d0050>Tj
+1 0 0 rg
+<003800500053004d0045>Tj
+ET
+
+Q
+q
+-0 -1 1 -0 0 841.89 cm
+1 0 0 RG
+101.8325 490.9505 58.08 16.188 re
+S
+Q
+)");
 }

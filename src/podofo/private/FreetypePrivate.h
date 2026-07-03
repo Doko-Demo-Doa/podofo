@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PODOFO_FREETYPE_PRIVATE_H
 #define PODOFO_FREETYPE_PRIVATE_H
@@ -18,29 +15,22 @@
 
 namespace FT
 {
-    /** Use this function instead to free a face handled by a FT_FacePtr
-     */
+    /// Use this function instead to free a face handled by a FT_FacePtr
     void FreeFace(FT_Face face);
 
-    /** Use this function instead to reference a face handled by a FT_FacePtr
-     */
+    /// Use this function instead to reference a face handled by a FT_FacePtr
     void ReferenceFace(FT_Face face);
 
-    /** An unique smart pointer to be returned by helpers in this header
-     * It implies faces will be freed with the specialized function FT::FreeFace
-     */
+    /// An unique smart pointer to be returned by helpers in this header
+    /// It implies faces will be freed with the specialized function FT::FreeFace
     using FT_FacePtr = std::unique_ptr<FT_FaceRec_, decltype(&FreeFace)>;
 
-    /**
-     * \param buffer a copy of the buffer from which the face will be loaded.
-     * It must be retained
-     */
+    /// @param buffer a copy of the buffer from which the face will be loaded.
+    /// It must be retained
     FT_FacePtr CreateFaceFromFile(const std::string_view& filepath, unsigned faceIndex,
         PoDoFo::charbuff& buffer);
-    /**
-     * \param buffer a copy of the buffer from which the face will be loaded.
-     * It must be retained
-     */
+    /// @param buffer a copy of the buffer from which the face will be loaded.
+    /// It must be retained
     FT_FacePtr CreateFaceFromBuffer(const PoDoFo::bufferview& view, unsigned faceIndex,
         PoDoFo::charbuff& buffer);
     // Extract a CFF table from a OpenType CFF font

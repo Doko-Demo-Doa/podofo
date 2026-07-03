@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfColorSpaceFilter.h"
@@ -197,18 +194,20 @@ PdfColorSpacePixelFormat PdfColorSpaceFilterIndexed::GetPixelFormat() const
 
 unsigned PdfColorSpaceFilterIndexed::GetSourceScanLineSize(unsigned width, unsigned bitsPerComponent) const
 {
-    // bitsPerComponent Ignored in /Indexed source scan line size. The "lookup" table
-    // always map to color components that are 8 bits size long
-    (void)bitsPerComponent;
-    return width;
+    // The source samples are index values packed at /BitsPerComponent bits each.
+    // Rows are byte-aligned.
+    return (width * bitsPerComponent + 8 - 1) / 8;
 }
 
 unsigned PdfColorSpaceFilterIndexed::GetScanLineSize(unsigned width, unsigned bitsPerComponent) const
 {
+    // The output is always 8-bit components of the base color space, regardless
+    // of the source /BitsPerComponent used to pack the indices
+    (void)bitsPerComponent;
     switch (m_BaseColorSpace->GetPixelFormat())
     {
         case PdfColorSpacePixelFormat::RGB:
-            return (3 * width * bitsPerComponent + 8 - 1) / 8;
+            return 3 * width;
         default:
             PODOFO_RAISE_ERROR_INFO(PdfErrorCode::UnsupportedFilter, "Unsupported base color space in /Indexed color space");
     }
@@ -220,28 +219,60 @@ void PdfColorSpaceFilterIndexed::FetchScanLine(unsigned char* dstScanLine, const
     {
         case PdfColorSpaceType::DeviceRGB:
         {
-            if (bitsPerComponent == 8)
+            auto lookup = (const unsigned char*)m_lookup.data();
+            // For /Indexed images only 1, 2, 4 and 8 are valid, since "hival shall be no
+            // greater than 255", as stated in ISO 32000-2:2020 8.6.6.3 "Indexed colour spaces"
+            switch (bitsPerComponent)
             {
-                for (unsigned i = 0; i < width; i++)
+                case 8:
                 {
-                    PODOFO_INVARIANT(srcScanLine[i] < m_MapSize);
-                    const unsigned char* mappedColor = (const unsigned char*)(m_lookup.data() + srcScanLine[i] * 3);
-                    *(dstScanLine + i * 3 + 0) = mappedColor[0];
-                    *(dstScanLine + i * 3 + 1) = mappedColor[1];
-                    *(dstScanLine + i * 3 + 2) = mappedColor[2];
+                    // Fast path: one index per byte, direct lookup
+                    for (unsigned i = 0; i < width; i++)
+                    {
+                        // Clamp the index on out-of-bounds palette access
+                        unsigned index = srcScanLine[i];
+                        if (index >= m_MapSize)
+                            index = m_MapSize - 1;
+
+                        auto mappedColor = lookup + index * 3;
+                        dstScanLine[i * 3 + 0] = mappedColor[0];
+                        dstScanLine[i * 3 + 1] = mappedColor[1];
+                        dstScanLine[i * 3 + 2] = mappedColor[2];
+                    }
+                    break;
                 }
-            }
-            else
-            {
-                PODOFO_RAISE_ERROR_INFO(PdfErrorCode::UnsupportedFilter, "/BitsPerComponent != 8");
+                case 4:
+                case 2:
+                case 1:
+                {
+                    // Indices packed most significant bit first within each byte, rows byte-aligned
+                    const unsigned mask = (1u << bitsPerComponent) - 1u; // Eg. for 4bpc, mask is 111b -> 0x0F
+                    unsigned bitOffset = 0;
+                    for (unsigned i = 0; i < width; i++)
+                    {
+                        unsigned inPixelShift = 8 - bitsPerComponent - (bitOffset % 8);
+                        unsigned index = (srcScanLine[bitOffset >> 3] >> inPixelShift) & mask;
+                        bitOffset += bitsPerComponent;
+
+                        // Clamp the index on out-of-bounds palette access
+                        if (index >= m_MapSize)
+                            index = m_MapSize - 1;
+
+                        auto mappedColor = lookup + index * 3;
+                        dstScanLine[i * 3 + 0] = mappedColor[0];
+                        dstScanLine[i * 3 + 1] = mappedColor[1];
+                        dstScanLine[i * 3 + 2] = mappedColor[2];
+                    }
+                    break;
+                }
+                default:
+                    PODOFO_RAISE_ERROR_INFO(PdfErrorCode::UnsupportedFilter, "Unsupported {} /BitsPerComponent in /Indexed color space", bitsPerComponent);
             }
             break;
         }
         default:
             PODOFO_RAISE_ERROR_INFO(PdfErrorCode::UnsupportedFilter, "Unsupported base color space in /Indexed color space");
     }
-
-
 }
 
 PdfVariant PdfColorSpaceFilterIndexed::GetExportObject(PdfIndirectObjectList& objects) const
@@ -342,35 +373,65 @@ PdfColorSpaceType PdfColorSpaceFilterSeparation::GetType() const
 
 bool PdfColorSpaceFilterSeparation::IsRawEncoded() const
 {
-    PODOFO_RAISE_ERROR(PdfErrorCode::NotImplemented);
+    // The tint component needs to be mapped through FetchScanLine
+    return false;
 }
 
 PdfColorSpacePixelFormat PdfColorSpaceFilterSeparation::GetPixelFormat() const
 {
-    PODOFO_RAISE_ERROR(PdfErrorCode::NotImplemented);
+    return PdfColorSpacePixelFormat::Grayscale;
 }
 
 unsigned PdfColorSpaceFilterSeparation::GetSourceScanLineSize(unsigned width, unsigned bitsPerComponent) const
 {
-    (void)width;
-    (void)bitsPerComponent;
-    PODOFO_RAISE_ERROR(PdfErrorCode::NotImplemented);
+    // The source is a single tint component packed at /BitsPerComponent bits, rows byte-aligned
+    return (width * bitsPerComponent + 8 - 1) / 8;
 }
 
 unsigned PdfColorSpaceFilterSeparation::GetScanLineSize(unsigned width, unsigned bitsPerComponent) const
 {
-    (void)width;
+    // The output is a single 8-bit grayscale component per pixel
     (void)bitsPerComponent;
-    PODOFO_RAISE_ERROR(PdfErrorCode::NotImplemented);
+    return width;
 }
 
 void PdfColorSpaceFilterSeparation::FetchScanLine(unsigned char* dstScanLine, const unsigned char* srcScanLine, unsigned width, unsigned bitsPerComponent) const
 {
-    (void)dstScanLine;
-    (void)srcScanLine;
-    (void)width;
-    (void)bitsPerComponent;
-    PODOFO_RAISE_ERROR(PdfErrorCode::NotImplemented);
+    // HACK: Treat the single tint component as an inverted grayscale value (tint 1 -> black)
+    // without evaluating the tint transform function
+    switch (bitsPerComponent)
+    {
+        case 16:
+        {
+            // Keep only the most significant byte of each 16-bit sample
+            for (unsigned i = 0; i < width; i++)
+                dstScanLine[i] = (unsigned char)(255 - srcScanLine[i * 2]);
+            break;
+        }
+        case 8:
+        {
+            for (unsigned i = 0; i < width; i++)
+                dstScanLine[i] = (unsigned char)(255 - srcScanLine[i]);
+            break;
+        }
+        case 4:
+        case 2:
+        case 1:
+        {
+            const unsigned mask = (1u << bitsPerComponent) - 1u;
+            unsigned bitOffset = 0;
+            for (unsigned i = 0; i < width; i++)
+            {
+                unsigned inPixelShift = 8 - bitsPerComponent - (bitOffset % 8);
+                unsigned tint = (srcScanLine[bitOffset >> 3] >> inPixelShift) & mask;
+                bitOffset += bitsPerComponent;
+                dstScanLine[i] = (unsigned char)(255 - (tint * 255 / mask));
+            }
+            break;
+        }
+        default:
+            PODOFO_RAISE_ERROR_INFO(PdfErrorCode::UnsupportedFilter, "Unsupported {} /BitsPerComponent in /Separation color space", bitsPerComponent);
+    }
 }
 
 PdfVariant PdfColorSpaceFilterSeparation::GetExportObject(PdfIndirectObjectList& objects) const
@@ -778,7 +839,7 @@ bool PdfColorSpaceFilterFactory::TryCreateFromObject(const PdfObject& obj, PdfCo
                 if (!TryCreateFromObject(arr->MustFindAt(1), baseColorSpace))
                     goto InvalidIndexed;
 
-                if (!arr->MustFindAt(2).TryGetNumber(maxIndex) && maxIndex < 1)
+                if (!arr->MustFindAt(2).TryGetNumber(maxIndex) || maxIndex < 1 || maxIndex > 255)
                     goto InvalidIndexed;
 
                 stream = arr->MustFindAt(3).GetStream();
@@ -795,6 +856,24 @@ bool PdfColorSpaceFilterFactory::TryCreateFromObject(const PdfObject& obj, PdfCo
             InvalidIndexed:
                 PoDoFo::LogMessage(PdfLogSeverity::Warning, "Invalid /Indexed color space name");
                 return false;
+            }
+            case PdfColorSpaceType::Separation:
+            {
+                // A /Separation color space is [/Separation name alternateSpace tintTransform]
+                const PdfName* sepName;
+                if (arr->GetSize() < 4 || !arr->MustFindAt(1).TryGetName(sepName))
+                {
+                    PoDoFo::LogMessage(PdfLogSeverity::Warning, "Invalid /Separation color space array");
+                    return false;
+                }
+
+                // HACK: We don't evaluate the tint transform function (the 4th array
+                // entry) nor map to the alternate color space (the 3rd entry). The single
+                // tint component is decoded as an inverted grayscale value (tint 1 -> black).
+                // This is exact for subtractive colorants like /Black mapping to (0,0,0,tint)
+                // in DeviceCMYK and a reasonable approximation for other spot colors
+                colorSpace.reset(new PdfColorSpaceFilterSeparation(sepName->GetString(), PdfColor(0.0)));
+                return true;
             }
             default:
                 PoDoFo::LogMessage(PdfLogSeverity::Warning, "Unsupported color space filter {}", name->GetString());

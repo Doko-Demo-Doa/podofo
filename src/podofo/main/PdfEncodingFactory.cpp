@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2021 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfEncodingFactory.h"
@@ -136,7 +133,7 @@ PdfEncoding PdfEncodingFactory::CreateEncoding(const PdfDictionary& fontDict, co
         }
         else
         {
-            // As a fallback, create an identity encoding of the size size of the /ToUnicode mapping
+            // As a fallback, create an identity encoding of the size of the /ToUnicode mapping
             encoding = PdfEncodingMapConstPtr(new PdfIdentityEncoding(PdfEncodingMapType::Indeterminate, toUnicode->GetLimits().MaxCodeSize));
         }
     }
@@ -204,7 +201,7 @@ PdfEncodingMapConstPtr PdfEncodingFactory::createEncodingMap(const PdfObject& ob
         else if (*name == "MacExpertEncoding")
             return PdfEncodingMapFactory::GetMacExpertEncodingInstancePtr();
 
-        // TABLE 5.15 Predefined CJK CMap names: the generip H-V identifies
+        // TABLE 5.15 Predefined CJK CMap names: the generic H-V identifies
         // are mappings for 2-byte CID. "It maps 2-byte character codes ranging
         // from 0 to 65,535 to the same 2 - byte CID value, interpreted high
         // order byte first"

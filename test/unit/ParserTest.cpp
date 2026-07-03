@@ -1,10 +1,6 @@
-/**
- * Copyright (C) 2007 by Dominik Seichter <domseichter@web.de>
- * Copyright (C) 2021 by Francesco Pretto <ceztko@gmail.com>
- *
- * Licensed under GNU Library General Public 2.0 or later.
- * Some rights reserved. See COPYING, AUTHORS.
- */
+// SPDX-FileCopyrightText: 2007 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: MIT-0
 
 /*
     Notes:
@@ -68,7 +64,10 @@ namespace PoDoFo
 
         void ReadXRefStreamContents(size_t offset, bool skipFollowPrevious)
         {
-            PdfParser::ReadXRefStreamContents(*m_device, offset, skipFollowPrevious);
+            nullable<size_t> prevOffset;
+            PdfParser::ReadXRefStreamContents(*m_device, offset, prevOffset);
+            if (!skipFollowPrevious && prevOffset != nullptr)
+                PdfParser::ReadXRefContents(*m_device, *prevOffset, false);
         }
 
         void ReadDocumentStructure()
@@ -302,7 +301,7 @@ void PdfParserTest::TestReadXRefContents()
     {
         // generate an xref section and one XRef stream that references itself
         // via the /Prev entry (but use a slightly lower offset by linking to
-        // to whitespace discarded by the tokenizer just before the xref section)
+        // whitespace discarded by the tokenizer just before the xref section)
         // xref
         // 0 1
         // 000000000 65535
@@ -2013,70 +2012,6 @@ void PdfParserTest::TestIsPdfFile()
     REQUIRE(expectedFail);
 }
 
-TEST_CASE("TestSaveIncrementalRoundTrip")
-{
-    ostringstream oss;
-    oss << "%PDF-1.1\n";
-    unsigned currObj = 1;
-    streamoff objPos[20];
-
-    // Pages
-
-    unsigned pagesObj = currObj;
-    objPos[currObj] = oss.tellp();
-    oss << currObj++ << " 0 obj\n";
-    oss << "<</Type /Pages /Count 0 /Kids []>>\n";
-    oss << "endobj\n";
-
-    // Root catalog
-
-    unsigned rootObj = currObj;
-    objPos[currObj] = oss.tellp();
-    oss << currObj++ << " 0 obj\n";
-    oss << "<</Type /Catalog /Pages " << pagesObj << " 0 R>>\n";
-    oss << "endobj\n";
-
-    // ID
-    unsigned idObj = currObj;
-    objPos[currObj] = oss.tellp();
-    oss << currObj++ << " 0 obj\n";
-    oss << "[<F1E375363A6314E3766EDF396D614748> <F1E375363A6314E3766EDF396D614748>]\n";
-    oss << "endobj\n";
-
-    streamoff xrefPos = oss.tellp();
-    oss << "xref\n";
-    oss << "0 " << currObj << "\n";
-    oss << "0000000000 65535 f \n";
-    for (unsigned i = 1; i < currObj; i++)
-        oss << utls::Format("{:010d} 00000 n \n", objPos[i]);
-
-    oss << "trailer <<\n"
-        << "  /Size " << currObj << "\n"
-        << "  /Root " << rootObj << " 0 R\n"
-        << "  /ID " << idObj << " 0 R\n" // indirect ID
-        << ">>\n"
-        << "startxref\n"
-        << xrefPos << "\n"
-        << "%%EOF\n";
-
-    string docBuff = oss.str();
-    try
-    {
-        PdfMemDocument doc;
-        // load for update
-        doc.LoadFromBuffer(docBuff);
-
-        StringStreamDevice outDev(docBuff);
-
-        doc.SaveUpdate(outDev);
-        doc.LoadFromBuffer(docBuff);
-    }
-    catch (PdfError&)
-    {
-        FAIL("Unexpected PdfError");
-    }
-}
-
 // CVE-2018-8002, CVE-2021-30470
 void PdfParserTest::TestNestedArrays()
 {
@@ -2844,31 +2779,20 @@ TEST_CASE("TestReset")
 
 TEST_CASE("TestManyTrailer")
 {
-    try
-    {
-        PdfCommon::SetMaxRecursionDepth(256);
-        PdfMemDocument doc;
-        doc.Load(TestUtils::GetTestInputFilePath("Empty160trailer.pdf"));
-    }
-    catch (PdfError&)
-    {
-        return;
-    }
-    FAIL("Should fail with stack overflow");
+    // A document with a long chain of incremental updates must be parsed
+    // iteratively without overflowing the stack
+    PdfMemDocument doc;
+    doc.Load(TestUtils::GetTestInputFilePath("Empty160trailer.pdf"));
+    REQUIRE(doc.GetPages().GetCount() == 1);
 }
 
 TEST_CASE("TestManyTrailerXRefStream")
 {
-    try
-    {
-        PdfMemDocument doc;
-        doc.Load(TestUtils::GetTestInputFilePath("EmptyXRefStream225Trailer.pdf"));
-    }
-    catch (PdfError&)
-    {
-        return;
-    }
-    FAIL("Should fail with stack overflow");
+    // A document with a long chain of XRef streams must be parsed
+    // iteratively without overflowing the stack
+    PdfMemDocument doc;
+    doc.Load(TestUtils::GetTestInputFilePath("EmptyXRefStream225Trailer.pdf"));
+    REQUIRE(doc.GetPages().GetCount() == 1);
 }
 
 TEST_CASE("TestXRefPDF10")

@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2005 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2005 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PODOFO_BASE_DEFS_H
 #define PODOFO_BASE_DEFS_H
@@ -40,6 +38,7 @@
 #define PODOFO_IMPORT
 
 #else // PODOFO_SHARED
+
 #ifndef PODOFO_SHARED
 #define PODOFO_SHARED
 #endif
@@ -57,6 +56,14 @@
     #define PODOFO_EXPORT __attribute__ ((visibility("default")))
     #define PODOFO_IMPORT __attribute__ ((visibility("default")))
     #define PODOFO_DEPRECATED __attribute__((__deprecated__))
+#endif
+
+#if defined(PODOFO_BUILD)
+#define PODOFO_API PODOFO_EXPORT
+#else
+#define PODOFO_API PODOFO_IMPORT
+#endif
+
 #endif
 
 // If detected, undefine some macros that are defined by Windows
@@ -85,26 +92,16 @@
 #endif // DrawText
 #endif
 
-#if defined(PODOFO_BUILD)
-#define PODOFO_API PODOFO_EXPORT
-#else
-#define PODOFO_API PODOFO_IMPORT
-#endif
-
-#endif
-
 // Set up some other compiler-specific but not platform-specific macros
 
-/** Specify the friend identifier is defined in private symbols only
- */
+/// Specify the friend identifier is defined in private symbols only
 #define PODOFO_PRIVATE_FRIEND(identifier)
 
 #ifndef PODOFO_3RDPARTY_INTEROP_ENABLED
-/** Define if interoperability with 3rd party APIs (such as
- * libraries like libxml2, Fontconfig) is enabled. Caution
- * is needed, as linkage of internally used structures
- * and user consumed must be the same
- */
+/// Define if interoperability with 3rd party APIs (such as
+/// libraries like libxml2, Fontconfig) is enabled. Caution
+/// is needed, as linkage of internally used structures
+/// and user consumed must be the same
 #define PODOFO_3RDPARTY_INTEROP_ENABLED 0
 #endif // PODOFO_3RDPARTY_INTEROP_ENABLED
 

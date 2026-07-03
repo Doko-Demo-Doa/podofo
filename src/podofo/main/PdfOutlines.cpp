@@ -1,7 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2006 Dominik Seichter <domseichter@web.de>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2006 Dominik Seichter <domseichter@web.de>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfOutlines.h"
@@ -66,7 +64,7 @@ void PdfOutlineItem::InsertChild(unique_ptr<PdfOutlineItem> item)
     (void)item.release();
 }
 
-/// <param name="checkSameTree">Check if the given item is in the same tree as this item</param>
+/// @param checkSameTree Check if the given item is in the same tree as this item
 void PdfOutlineItem::insertChildInternal(PdfOutlineItem* item, bool checkSameTree)
 {
     if (item == nullptr)

@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2010 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2010 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_FONT_METRICS_OBJECT_H
 #define PDF_FONT_METRICS_OBJECT_H
@@ -24,11 +22,9 @@ class PODOFO_API PdfFontMetricsObject final : public PdfFontMetricsBase
     friend class PdfFont;
 
 private:
-    /** Create a font metrics object based on an existing PdfObject
-     *
-     *  \param obj an existing font descriptor object
-     *  \param pEncoding a PdfEncoding which will NOT be owned by PdfFontMetricsObject
-     */
+    /// Create a font metrics object based on an existing PdfObject
+    ///
+    /// @param fontDict an existing font descriptor object
     PdfFontMetricsObject(const PdfDictionary& fontDict, const PdfReference& fontRef, const PdfDictionary* descriptorDict);
 
 public:

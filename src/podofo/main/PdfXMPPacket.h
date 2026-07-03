@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_XMP_PACKET
 #define PDF_XMP_PACKET
@@ -56,8 +53,7 @@ namespace PoDoFo
         void SetMetadata(const PdfMetadataStore& metadata);
         void ToString(std::string& str) const;
         std::string ToString() const;
-        /** Remove invalid properties based on specific PDF/A level
-         */
+        /// Remove invalid properties based on specific PDF/A level
         void PruneAndValidate(PdfALevel level, const std::function<void(const PdfXMPProperty& prop)>& warnings = nullptr);
 #ifdef PODOFO_3RDPARTY_INTEROP_ENABLED
         void PruneAndValidate(PdfALevel level, const std::function<void(const PdfXMPProperty& prop, xmlNodePtr)>& warnings);

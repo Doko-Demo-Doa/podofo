@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_PREDEFINED_TO_UNICODE_CMAP_H
 #define PDF_PREDEFINED_TO_UNICODE_CMAP_H
@@ -11,12 +8,10 @@
 
 namespace PoDoFo
 {
-    /**
-     * Represents a predefined ToUnicode CMap as the ones described in
-     * ISO 32000-2:2020 "9.10.2 Mapping character codes to Unicode values"
-     * that can be downloaded from https://github.com/adobe-type-tools/mapping-resources-pdf,
-     * folder "pdf2unicode"
-     */
+    /// Represents a predefined ToUnicode CMap as the ones described in
+    /// ISO 32000-2:2020 "9.10.2 Mapping character codes to Unicode values"
+    /// that can be downloaded from https://github.com/adobe-type-tools/mapping-resources-pdf,
+    /// folder "pdf2unicode"
     class PODOFO_API PdfPredefinedToUnicodeCMap final : public PdfEncodingMap
     {
         friend class PdfEncodingFactory;

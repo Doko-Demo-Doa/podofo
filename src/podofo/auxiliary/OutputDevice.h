@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2006 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2006 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef AUX_OUTPUT_DEVICE_H
 #define AUX_OUTPUT_DEVICE_H
@@ -22,8 +20,7 @@ protected:
     OutputStreamDevice(bool init);
 
 public:
-    /** Truncate the file at this position by discarding subsequent bytes
-     */
+    /// Truncate the file at this position by discarding subsequent bytes
     void Truncate();
 
 protected:

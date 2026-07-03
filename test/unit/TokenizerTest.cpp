@@ -1,10 +1,6 @@
-/**
- * Copyright (C) 2007 by Dominik Seichter <domseichter@web.de>
- * Copyright (C) 2021 by Francesco Pretto <ceztko@gmail.com>
- *
- * Licensed under GNU Library General Public 2.0 or later.
- * Some rights reserved. See COPYING, AUTHORS.
- */
+// SPDX-FileCopyrightText: 2007 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: MIT-0
 
 #include <PdfTest.h>
 
@@ -173,7 +169,7 @@ TEST_CASE("TestComments")
 
 TEST_CASE("TestLocale")
 {
-    // Test with a locale thate uses "," instead of "." for doubles 
+    // Test with a locale that uses "," instead of "." for doubles 
     char* old = setlocale(LC_ALL, "de_DE");
 
     Test("3.140000", PdfDataType::Real, "3.14");

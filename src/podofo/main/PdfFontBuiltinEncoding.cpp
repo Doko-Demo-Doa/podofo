@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2021 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfFontMetricsObject.h"
@@ -20,8 +17,7 @@ using namespace PoDoFo;
 
 namespace PoDoFo
 {
-    /** A built-in encoding for a /Type1 font program
-     */
+    /// A built-in encoding for a /Type1 font program
     class PdfFontBuiltinType1Encoding final : public PdfEncodingMapSimple
     {
     public:

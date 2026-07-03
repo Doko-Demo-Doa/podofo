@@ -1,12 +1,10 @@
-/**
- * SPDX-FileCopyrightText: (C) 2023 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2023 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: (LGPL-2.0-or-later WITH cryptsetup-OpenSSL-exception) OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "OpenSSLInternal.h"
 
+#include <openssl/rsa.h>
 #if OPENSSL_VERSION_MAJOR >= 3
 #include <openssl/provider.h>
 #endif // OPENSSL_VERSION_MAJOR >= 3
@@ -26,7 +24,7 @@ OpenSSLMain::OpenSSLMain() :
 #if OPENSSL_VERSION_MAJOR >= 3
     m_libCtx{ }, m_legacyProvider{ }, m_defaultProvider{ },
 #endif // OPENSSL_VERSION_MAJOR >= 3
-    m_Rc4{ }, m_Aes128{ }, m_Aes256{ }, m_MD5{ },
+    m_Rc4{ }, m_Aes128{ }, m_Aes256_CBC{ }, m_Aes256_ECB{ }, m_MD5{ },
     m_SHA1{ }, m_SHA256{ }, m_SHA384{ }, m_SHA512{ }
 {
 }
@@ -50,7 +48,8 @@ void OpenSSLMain::Init()
     if (m_legacyProvider != nullptr)
         m_Rc4 = EVP_CIPHER_fetch(m_libCtx, "RC4", "provider=legacy");
     m_Aes128 = EVP_CIPHER_fetch(m_libCtx, "AES-128-CBC", "provider=default");
-    m_Aes256 = EVP_CIPHER_fetch(m_libCtx, "AES-256-CBC", "provider=default");
+    m_Aes256_CBC = EVP_CIPHER_fetch(m_libCtx, "AES-256-CBC", "provider=default");
+    m_Aes256_ECB = EVP_CIPHER_fetch(m_libCtx, "AES-256-ECB", "provider=default");
     m_MD5 = EVP_MD_fetch(m_libCtx, "MD5", "provider=default");
     m_SHA1 = EVP_MD_fetch(m_libCtx, "SHA1", "provider=default");
     m_SHA256 = EVP_MD_fetch(m_libCtx, "SHA2-256", "provider=default");
@@ -59,7 +58,8 @@ void OpenSSLMain::Init()
 #else // OPENSSL_VERSION_MAJOR < 3
     m_Rc4 = EVP_rc4();
     m_Aes128 = EVP_aes_128_cbc();
-    m_Aes256 = EVP_aes_256_cbc();
+    m_Aes256_CBC = EVP_aes_256_cbc();
+    m_Aes256_ECB = EVP_aes_256_ecb();
     m_MD5 = EVP_md5();
     m_SHA1 = EVP_sha1();
     m_SHA256 = EVP_sha256();
@@ -92,15 +92,20 @@ void ssl::AddSigningCertificateV2(CMS_SignerInfo* signer, const bufferview& hash
 
     unsigned char* buf = nullptr;
     MY_ESS_SIGNING_CERT_V2 certV2{ };
-    ASN1_OCTET_STRING hashstr{ };
-    ASN1_OCTET_STRING_set(&hashstr, (const unsigned char*)hash.data(), (int)hash.size());
-    MY_ESS_CERT_ID_V2 certIdV2{ };
+    unique_ptr<ASN1_OCTET_STRING, decltype(&ASN1_OCTET_STRING_free)> hashstr(ASN1_OCTET_STRING_new(), ASN1_OCTET_STRING_free);
+    if (hashstr == nullptr)
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::OpenSSLError, "Error ASN1_OCTET_STRING_new: Out of memory");
+    ASN1_OCTET_STRING_set(hashstr.get(), (const unsigned char*)hash.data(), (int)hash.size());
 
+    MY_ESS_CERT_ID_V2 certIdV2{ };
     certIdV2.hash_alg = x509Algor.get();
-    certIdV2.hash = &hashstr;
+    certIdV2.hash = hashstr.get();
     certV2.cert_ids = sk_MY_ESS_CERT_ID_V2_new_null();
     if (!sk_MY_ESS_CERT_ID_V2_push(certV2.cert_ids, &certIdV2))
+    {
+        sk_MY_ESS_CERT_ID_V2_free(certV2.cert_ids);
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::OpenSSLError, "Unable to add attribute");
+    }
 
     auto clean = [&]()
     {
@@ -128,6 +133,7 @@ EVP_PKEY* ssl::LoadPrivateKey(const bufferview& input)
         return ret;
 
     // Then try to load a ECDSA DER private
+    data = (const unsigned char*)input.data(); // Reset the input as it may be used as an iterator
     ret = d2i_PrivateKey(EVP_PKEY_EC, nullptr, &data, (long)input.size());
     if (ret != nullptr)
         return ret;
@@ -155,11 +161,10 @@ unsigned ssl::GetSignedHashSize(EVP_PKEY* pkey)
 void ssl::cmsAddSigningTime(CMS_SignerInfo* si, const date::sys_seconds& timestamp)
 {
     auto time = chrono::system_clock::to_time_t(timestamp);
-    auto ans1time = X509_time_adj(nullptr, 0, &time);
+    unique_ptr<ASN1_TIME, decltype(&ASN1_TIME_free)> asn1time(X509_time_adj(nullptr, 0, &time), ASN1_TIME_free);
     if (CMS_signed_add1_attr_by_NID(si, NID_pkcs9_signingTime,
-        ans1time->type, ans1time, -1) <= 0)
+        ASN1_STRING_type(asn1time.get()), asn1time.get(), -1) <= 0)
     {
-        ASN1_TIME_free(ans1time);
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::OpenSSLError, "Error setting SigningTime");
     }
 }
@@ -363,10 +368,16 @@ const EVP_CIPHER* ssl::Aes128()
     return s_SSL.GetAes128();
 }
 
-const EVP_CIPHER* ssl::Aes256()
+const EVP_CIPHER* ssl::Aes256_CBC()
 {
     ssl::Init();
-    return s_SSL.GetAes256();
+    return s_SSL.GetAes256_CBC();
+}
+
+const EVP_CIPHER* ssl::Aes256_ECB()
+{
+    ssl::Init();
+    return s_SSL.GetAes256_ECB();
 }
 
 const EVP_MD* ssl::MD5()

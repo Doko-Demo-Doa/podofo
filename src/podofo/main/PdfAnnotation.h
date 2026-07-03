@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2006 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2006 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_ANNOTATION_H
 #define PDF_ANNOTATION_H
@@ -45,8 +43,7 @@ class PdfAnnotationWebMedia;
 class PdfAnnotationRedact;
 class PdfAnnotationProjection;
 
-/** A qualified appearance stream, with type and state name
- */
+/// A qualified appearance stream, with type and state name
 struct PODOFO_API PdfAppearanceStream final
 {
     const PdfObject* Object = nullptr;
@@ -54,11 +51,19 @@ struct PODOFO_API PdfAppearanceStream final
     PdfName State;
 };
 
-/** An annotation to a PdfPage
- *  To create an annotation use PdfPage::CreateAnnotation
- *
- *  \see PdfPage::CreateAnnotation
- */
+enum class PdfSetAppearanceFlags : uint32_t
+{
+    None = 0,
+    Raw =               1 << 0,     ///< Insert the appearance stream without handling page rotations
+    SkipSelectedState = 1 << 1,     ///< Skip setting the selected state
+    InplaceRotation =   1 << 2,     ///< Try skip inserting a XObject trampoline for the appearance stream in case of page rotations.
+                                    ///< Requires a mutable PdfXObject to be passed to SetAppearanceStream
+};
+
+/// An annotation to a PdfPage
+/// To create an annotation use PdfPage::CreateAnnotation
+///
+/// @see PdfPage::CreateAnnotation
 class PODOFO_API PdfAnnotation : public PdfDictionaryElement
 {
     friend class PdfAnnotationCollection;
@@ -110,141 +115,137 @@ public:
     static bool TryCreateFromObject(const PdfObject& obj, std::unique_ptr<const TAnnotation>& xobj);
 
 public:
-    /** Set an appearance stream for this object
-     *  to specify its visual appearance
-     *  \param xobj an XObject form
-     *  \param appearance an appearance type to set
-     *  \param state the state for which set it the obj; states depend on the annotation type
-     *  \param skipSelectedState skip setting the selected state, if non null
-     */
-    void SetAppearanceStream(const PdfXObject& xobj, PdfAppearanceType appearance = PdfAppearanceType::Normal,
-        const PdfName& state = { }, bool skipSelectedState = false);
+    /// Set an appearance stream for this object
+    /// to specify its visual appearance
+    /// @param xobj an XObject form
+    /// @param appearance an appearance type to set
+    /// @param state the state for which set it the obj; states depend on the annotation type
+    /// @param flags flags to control the appearance stream setting
+    void SetAppearanceStream(const PdfXObject& xobj, PdfSetAppearanceFlags flags = PdfSetAppearanceFlags::None,
+        PdfAppearanceType appearance = PdfAppearanceType::Normal, const PdfName& state = { });
+    void SetAppearanceStream(PdfXObject& xobj, PdfSetAppearanceFlags flags,
+        PdfAppearanceType appearance = PdfAppearanceType::Normal, const PdfName& state = { });
+    void SetAppearanceStream(const PdfXObject& xobj, PdfAppearanceType appearance, const PdfName& state = { });
 
-    /** Set an appearance stream for this object
-     *  to specify its visual appearance without handling page rotations
-     *  \param xobj an XObject form
-     *  \param appearance an appearance type to set
-     *  \param state the state for which set it the obj; states depend on the annotation type
-     *  \param skipSelectedState skip setting the selected state, if non null
-     */
+    /// Set an appearance stream for this object
+    /// to specify its visual appearance
+    /// @param xobj an XObject form
+    /// @param appearance an appearance type to set
+    /// @param state the state for which set it the obj; states depend on the annotation type
+    /// @param skipSelectedState skip setting the selected state, if non null
+    [[deprecated("Use the SetAppearanceStream methods with flags instead")]]
+    void SetAppearanceStream(const PdfXObject& xobj, PdfAppearanceType appearance,
+        const PdfName& state, bool skipSelectedState);
+
+    /// Set an appearance stream for this object
+    /// to specify its visual appearance without handling page rotations
+    /// @param xobj an XObject form
+    /// @param appearance an appearance type to set
+    /// @param state the state for which set it the obj; states depend on the annotation type
+    /// @param skipSelectedState skip setting the selected state, if non null
+    [[deprecated("Use the SetAppearanceStream methods with flags instead")]]
     void SetAppearanceStreamRaw(const PdfXObject& xobj, PdfAppearanceType appearance = PdfAppearanceType::Normal,
         const PdfName& state = { }, bool skipSelectedState = false);
 
-    /** Get a list of qualified appearance streams
-     */
+    /// Get a list of qualified appearance streams
+     ///  @param states a vector to receive the appearance streams
     void GetAppearanceStreams(std::vector<PdfAppearanceStream>& states) const;
 
     void ClearAppearances();
 
-    /**
-    * \returns the appearance /AP object for this annotation
-    */
+    /// @returns the appearance /AP object for this annotation
     PdfObject* GetAppearanceDictionaryObject();
     const PdfObject* GetAppearanceDictionaryObject() const;
 
-    /**
-    * \returns the appearance stream for this object
-     *  \param appearance an appearance type to get
-     *  \param state a child state. Meaning depends on the annotation type
-    */
+    /// @returns the appearance stream for this object
+    /// @param appearance an appearance type to get
+    /// @param state a child state. Meaning depends on the annotation type
     PdfObject* GetAppearanceStream(PdfAppearanceType appearance = PdfAppearanceType::Normal, const std::string_view& state = { });
     const PdfObject* GetAppearanceStream(PdfAppearanceType appearance = PdfAppearanceType::Normal, const std::string_view& state = { }) const;
 
-    /** Get the rectangle of this annotation.
-     *  \returns a rectangle. It's oriented according to the canonical PDF coordinate system
-     */
+    /// Get the rectangle of this annotation.
+    /// @returns a rectangle. It's oriented according to the canonical PDF coordinate system
     Rect GetRect() const;
 
-    /** Set the rectangle of this annotation.
-     * \param rect rectangle to set. It's oriented according to the canonical PDF coordinate system
-     */
+    /// Set the rectangle of this annotation.
+    /// @param rect rectangle to set. It's oriented according to the canonical PDF coordinate system
     void SetRect(const Rect& rect);
 
     Corners GetRectRaw() const;
 
     void SetRectRaw(const Corners& rect);
 
-    /** Set the flags of this annotation.
-     *  \see GetFlags
-     */
+    /// Set the flags of this annotation.
+    /// @see GetFlags
     void SetFlags(PdfAnnotationFlags flags);
 
-    /** Get the flags of this annotation.
-     *  \returns the flags which is an unsigned 32bit integer with different
-     *           PdfAnnotationFlags OR'ed together.
-     *
-     *  \see SetFlags
-     */
+    /// Get the flags of this annotation.
+    /// @returns the flags which is an unsigned 32bit integer with different
+    ///           PdfAnnotationFlags OR'ed together.
+    ///
+    /// @see SetFlags
     PdfAnnotationFlags GetFlags() const;
 
-    /** Set the annotations border style.
-     *  \param hCorner horitzontal corner radius
-     *  \param vCorner vertical corner radius
-     *  \param width width of border
-     */
+    /// Set the annotations border style.
+    /// @param hCorner horizontal corner radius
+    /// @param vCorner vertical corner radius
+    /// @param width width of border
     void SetBorderStyle(double hCorner, double vCorner, double width);
 
-    /** Set the annotations border style.
-     *  \param hCorner horitzontal corner radius
-     *  \param dVCorner vertical corner radius
-     *  \param width width of border
-     *  \param strokeStyle a custom stroke style pattern
-     */
+    /// Set the annotations border style.
+    /// @param hCorner horizontal corner radius
+    /// @param vCorner vertical corner radius
+    /// @param width width of border
+    /// @param strokeStyle a custom stroke style pattern
     void SetBorderStyle(double hCorner, double vCorner, double width, const PdfArray& strokeStyle);
 
-    /** Set the title of this annotation.
-     *  \param title title of the annotation as string in PDF format
-     *
-     *  \see GetTitle
-     */
+    /// Set the title of this annotation.
+    /// @param title title of the annotation as string in PDF format
+    ///
+    /// @see GetTitle
     void SetTitle(nullable<const PdfString&> title);
 
-    /** Get the title of this annotation
-     *
-     *  \returns the title of this annotation
-     *
-     *  \see SetTitle
-     */
+    /// Get the title of this annotation
+    ///
+    /// @returns the title of this annotation
+    ///
+    /// @see SetTitle
     nullable<const PdfString&> GetTitle() const;
 
-    /** Set the text of this annotation.
-     *
-     *  \param contents text of the annotation as string in PDF format
-     *
-     *  \see GetContents
-     */
+    /// Set the text of this annotation.
+    ///
+    /// @param contents text of the annotation as string in PDF format
+    ///
+    /// @see GetContents
     void SetContents(nullable<const PdfString&> contents);
 
-    /** Get the text of this annotation
-     *
-     *  \returns the contents of this annotation
-     *
-     *  \see SetContents
-     */
+    /// Get the text of this annotation
+    ///
+    /// @returns the contents of this annotation
+    ///
+    /// @see SetContents
     nullable<const PdfString&> GetContents() const;
 
-    /** Get the color key of the Annotation dictionary
-     *  which defines the color of the annotation,
-     *  as per 8.4 of the pdf spec.
-     */
-
+    /// Get the color key of the Annotation dictionary
+    /// which defines the color of the annotation,
+    /// as per 8.4 of the pdf spec.
+    ///
+    /// @returns the color of the annotation
     PdfColor GetColor() const;
 
-    /** Set the C key of the Annotation dictionary, which defines the
-     *  color of the annotation, as per 8.4 of the pdf spec.
-     */
+    /// Set the C key of the Annotation dictionary, which defines the
+    /// color of the annotation, as per 8.4 of the pdf spec.
+    /// @param color the color of the annotation
     void SetColor(nullable<const PdfColor&> color);
 
 public:
-    /** Get the type of this annotation
-     *  \returns the annotation type
-     */
+    /// Get the type of this annotation
+    /// @returns the annotation type
     inline PdfAnnotationType GetType() const { return m_AnnotationType; }
 
-    /** Get the page of this PdfField
-     *
-     *  \returns the page of this PdfField
-     */
+    /// Get the page of this PdfField
+    ///
+    /// @returns the page of this PdfField
     inline PdfPage* GetPage() { return m_Page; }
     inline const PdfPage* GetPage() const { return m_Page; }
     PdfPage& MustGetPage();
@@ -258,9 +259,8 @@ private:
 
     void SetPage(PdfPage& page) { m_Page = &page; }
 
-    void PushAppearanceStream(const PdfXObject& xobj, PdfAppearanceType appearance, const PdfName& state, bool raw);
-
 private:
+    void setAppearanceStream(PdfXObject& xobj, PdfSetAppearanceFlags flags, PdfAppearanceType appearance, const PdfName& state);
     static bool tryCreateFromObject(const PdfObject& obj, PdfAnnotationType targetType, PdfAnnotation*& xobj);
     static PdfAnnotationType getAnnotationType(const PdfObject& obj);
     PdfObject* getAppearanceStream(PdfAppearanceType appearance, const std::string_view& state) const;
@@ -359,5 +359,7 @@ constexpr PdfAnnotationType PdfAnnotation::GetAnnotationType()
 }
 
 };
+
+ENABLE_BITMASK_OPERATORS(PoDoFo::PdfSetAppearanceFlags);
 
 #endif // PDF_ANNOTATION_H

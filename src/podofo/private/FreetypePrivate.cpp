@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include "PdfDeclarationsPrivate.h"
 #include "FreetypePrivate.h"
@@ -228,7 +225,7 @@ unordered_map<string_view, unsigned> FT::GetPostMap(FT_Face face)
     return ret;
 }
 
-/// <param name="bare">True if the smart pointer </param>
+/// @param bare True if the smart pointerF
 FT::FT_FacePtr createFaceFromBuffer(const bufferview& view, unsigned faceIndex, bool bare)
 {
     FT_Error rc;

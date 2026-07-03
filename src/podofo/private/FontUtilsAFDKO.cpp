@@ -1,19 +1,18 @@
-/**
- * SPDX-FileCopyrightText: (C) 2024 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: Apache-2.0
- */
+// SPDX-FileCopyrightText: (C) 2014 Adobe Systems Incorporated (http://www.adobe.com/)
+// SPDX-FileCopyrightText: (C) 2024 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: Apache-2.0
+
+ // The following functions are a re-elaboration of software developed found int
+ // the Adobe Font Development Kit for OpenType (https://github.com/adobe-type-tools/afdko)
+ // License: https://github.com/adobe-type-tools/afdko?tab=License-1-ov-file#readme
 
 #include "PdfDeclarationsPrivate.h"
-#include "FontUtils.h"
+#include "FontUtilsAFDKO.h"
 #include <afdko/include/cffwrite.h>
 #include <afdko/include/t1read.h>
 #include <afdko/include/cffread.h>
 
 #include <podofo/private/FreetypePrivate.h>
-
- // The following functions include software developed by
- // the Adobe Font Development Kit for OpenType (https://github.com/adobe-type-tools/afdko)
- // License: https://github.com/adobe-type-tools/afdko?tab=License-1-ov-file#readme
 
 using namespace std;
 using namespace PoDoFo;
@@ -745,7 +744,7 @@ static void doConversion(ConvCtxPtr h)
     }
 }
 
-void PoDoFo::ConvertFontType1ToCFF(const bufferview& src, charbuff& dst)
+void afdko::ConvertFontType1ToCFF(const bufferview& src, charbuff& dst)
 {
     ConvCtx ctx(src, dst);
     setModeCFF(&ctx);
@@ -755,7 +754,7 @@ void PoDoFo::ConvertFontType1ToCFF(const bufferview& src, charbuff& dst)
     ctx.dst.endset(&ctx);
 }
 
-void PoDoFo::SubsetFontCFF(const PdfFontMetrics& metrics, const cspan<PdfCharGIDInfo>& subsetInfos,
+void afdko::SubsetFontCFF(const PdfFontMetrics& metrics, const cspan<PdfCharGIDInfo>& subsetInfos,
     const PdfCIDSystemInfo& cidInfo, charbuff& dst)
 {
     PODOFO_ASSERT(metrics.GetFontFileType() == PdfFontFileType::Type1CFF

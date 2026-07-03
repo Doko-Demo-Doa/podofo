@@ -1,17 +1,13 @@
-/**
- * SPDX-FileCopyrightText: (C) 2006 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2021 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2006 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PODOFO_H
 #define PODOFO_H
 
-/**
- * This file can be used in client applications to include
- * all files required by podofo at once.
- */
+/// @file podofo.h
+/// This file can be used in client applications to include
+/// all files required by podofo at once.
 
  // Auxiliary headers
 #include "auxiliary/StreamDeviceBase.h"

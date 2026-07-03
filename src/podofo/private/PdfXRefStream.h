@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2007 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2007 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_XREF_STREAM_H
 #define PDF_XREF_STREAM_H
@@ -12,21 +10,18 @@
 
 namespace PoDoFo {
 
-/**
- * Creates an XRef table that is a stream object.
- * Requires at least PDF 1.5. XRef streams are more
- * compact than normal XRef tables.
- *
- * This is an internal class of PoDoFo used by PdfWriter.
- */
+/// Creates an XRef table that is a stream object.
+/// Requires at least PDF 1.5. XRef streams are more
+/// compact than normal XRef tables.
+///
+/// This is an internal class of PoDoFo used by PdfWriter.
 class PdfXRefStream final : public PdfXRef
 {
 public:
-    /** Create a new XRef table
-     *
-     *  \param writer is needed to fill the trailer directory
-     *                 correctly which is included into the XRef
-     */
+    /// Create a new XRef table
+    ///
+    /// @param writer is needed to fill the trailer directory
+    ///                 correctly which is included into the XRef
     PdfXRefStream(PdfWriter& writer);
 
 public:

@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2005 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2005 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfPainter.h"
@@ -16,6 +14,7 @@
 #include "PdfFontMetrics.h"
 #include "PdfImage.h"
 #include "PdfDocument.h"
+#include "PdfMath.h"
 
 using namespace std;
 using namespace PoDoFo;
@@ -26,6 +25,7 @@ PdfPainter::PdfPainter() :
     m_flags(PdfPainterFlags::None),
     m_painterStatus(StatusDefault),
     m_textStackCount(0),
+    m_rotationPending(false),
     GraphicsState(*this, m_StateStack.Current->GraphicsState),
     TextState(*this, m_StateStack.Current->TextState),
     TextObject(*this),
@@ -65,6 +65,7 @@ void PdfPainter::SetCanvas(PdfCanvas& canvas, PdfPainterFlags flags)
     m_canvas = &canvas;
     m_flags = flags;
     m_objStream = nullptr;
+    initRotation();
 }
 
 void PdfPainter::FinishDrawing()
@@ -139,6 +140,8 @@ void PdfPainter::reset()
     m_canvas = nullptr;
     m_stream.Clear();
     m_resNameCache.clear();
+    m_rotationPending = false;
+    m_rotation = Matrix();
 }
 
 void PdfPainter::SetStrokeStyle(PdfStrokeStyle strokeStyle, bool inverted, double scale, bool subtractJoinCap)
@@ -331,20 +334,28 @@ void PdfPainter::DrawText(const string_view& str, double x, double y,
     checkStatus(StatusDefault);
     checkFont();
 
+    // NOTE: Pre-resolve all throwable operations before emitting any stream operators
+    auto& font = *m_StateStack.Current->TextState.Font;
+    auto expStr = this->expandTabs(str);
+    auto encoded = font.GetEncoding().ConvertToEncoded(expStr);
+    tryAddResource(font.GetObject(), PdfResourceType::Font);
+
     vector<array<double, 4>> linesToDraw;
     save();
     PoDoFo::WriteOperator_BT(m_stream);
     writeTextState();
-    drawText(str, x, y,
+    drawText(expStr, x, y,
         (style & PdfDrawTextStyle::Underline) != PdfDrawTextStyle::Regular,
-        (style & PdfDrawTextStyle::StrikeThrough) != PdfDrawTextStyle::Regular, linesToDraw);
+        (style & PdfDrawTextStyle::StrikeThrough) != PdfDrawTextStyle::Regular, linesToDraw,
+        encoded);
     PoDoFo::WriteOperator_ET(m_stream);
     drawLines(linesToDraw);
     restore();
 }
 
 void PdfPainter::drawText(const string_view& str, double x, double y,
-    bool isUnderline, bool isStrikeThrough, vector<array<double, 4>>& linesToDraw)
+    bool isUnderline, bool isStrikeThrough, vector<array<double, 4>>& linesToDraw,
+    string_view encoded)
 {
     auto& textState = m_StateStack.Current->TextState;
     auto& font = *textState.Font;
@@ -376,7 +387,7 @@ void PdfPainter::drawText(const string_view& str, double x, double y,
 
     PoDoFo::WriteOperator_Td(m_stream, x, y);
 
-    PoDoFo::WriteOperator_Tj(m_stream, font.GetEncoding().ConvertToEncoded(str),
+    PoDoFo::WriteOperator_Tj(m_stream, encoded,
         !font.GetEncoding().IsSimpleEncoding());
 }
 
@@ -411,11 +422,17 @@ void PdfPainter::DrawTextAligned(const string_view& str, double x, double y, dou
     checkStatus(StatusDefault | StatusTextObject);
     checkFont();
 
+    // NOTE: Pre-resolve all throwable operations before emitting any stream operators
+    auto& font = *m_StateStack.Current->TextState.Font;
+    auto expStr = this->expandTabs(str);
+    auto encoded = font.GetEncoding().ConvertToEncoded(expStr);
+    tryAddResource(font.GetObject(), PdfResourceType::Font);
+
     save();
     PoDoFo::WriteOperator_BT(m_stream);
     writeTextState();
     vector<array<double, 4>> linesToDraw;
-    drawTextAligned(str, x, y, width, hAlignment, style, linesToDraw);
+    drawTextAligned(expStr, x, y, width, hAlignment, style, linesToDraw, encoded);
     PoDoFo::WriteOperator_ET(m_stream);
     drawLines(linesToDraw);
     restore();
@@ -428,15 +445,24 @@ void PdfPainter::drawMultiLineText(const string_view& str, double x, double y, d
     auto& textState = m_StateStack.Current->TextState;
     auto& font = *textState.Font;
 
+    // NOTE: Pre-resolve all throwable operations before touching the stream
+    vector<string> lines = textState.SplitTextAsLines(str, width, preserveTrailingSpaces);
+    vector<charbuff> encodedLines;
+    encodedLines.reserve(lines.size());
+    for (unsigned i = 0; i < lines.size(); i++)
+    {
+        auto& line = lines[i];
+        encodedLines.push_back(line.empty() ? charbuff{} : font.GetEncoding().ConvertToEncoded(line));
+    }
+
+    tryAddResource(font.GetObject(), PdfResourceType::Font);
+
     this->save();
     if (!skipClip)
         this->SetClipRect(x, y, width, height);
 
-    auto expanded = this->expandTabs(str);
-
     PoDoFo::WriteOperator_BT(m_stream);
     writeTextState();
-    vector<string> lines = m_StateStack.Current->TextState.SplitTextAsLines(str, width, preserveTrailingSpaces);
     double lineGap = font.GetLineSpacing(textState) - font.GetAscent(textState) + font.GetDescent(textState);
     // Do vertical alignment
     switch (vAlignment)
@@ -455,10 +481,10 @@ void PdfPainter::drawMultiLineText(const string_view& str, double x, double y, d
 
     y -= font.GetAscent(textState) + lineGap / 2;
     vector<array<double, 4>> linesToDraw;
-    for (auto& line : lines)
+    for (unsigned i = 0; i < lines.size(); i++)
     {
-        if (line.length() != 0)
-            this->drawTextAligned(line, x, y, width, hAlignment, style, linesToDraw);
+        if (lines[i].length() != 0)
+            this->drawTextAligned(lines[i], x, y, width, hAlignment, style, linesToDraw, encodedLines[i]);
 
         x = 0;
         switch (hAlignment)
@@ -467,10 +493,10 @@ void PdfPainter::drawMultiLineText(const string_view& str, double x, double y, d
             case PdfHorizontalAlignment::Left:
                 break;
             case PdfHorizontalAlignment::Center:
-                x = -(width - textState.Font->GetStringLength(line, textState)) / 2.0;
+                x = -(width - textState.Font->GetStringLength(lines[i], textState)) / 2.0;
                 break;
             case PdfHorizontalAlignment::Right:
-                x = -(width - textState.Font->GetStringLength(line, textState));
+                x = -(width - textState.Font->GetStringLength(lines[i], textState));
                 break;
         }
         y = -font.GetLineSpacing(textState);
@@ -481,7 +507,8 @@ void PdfPainter::drawMultiLineText(const string_view& str, double x, double y, d
 }
 
 void PdfPainter::drawTextAligned(const string_view& str, double x, double y, double width,
-    PdfHorizontalAlignment hAlignment, PdfDrawTextStyle style, vector<array<double, 4>>& linesToDraw)
+    PdfHorizontalAlignment hAlignment, PdfDrawTextStyle style, vector<array<double, 4>>& linesToDraw,
+    string_view encoded)
 {
     auto& textState = m_StateStack.Current->TextState;
     switch (hAlignment)
@@ -500,7 +527,7 @@ void PdfPainter::drawTextAligned(const string_view& str, double x, double y, dou
     this->drawText(str, x, y,
         (style & PdfDrawTextStyle::Underline) != PdfDrawTextStyle::Regular,
         (style & PdfDrawTextStyle::StrikeThrough) != PdfDrawTextStyle::Regular,
-        linesToDraw);
+        linesToDraw, encoded);
 }
 
 void PdfPainter::DrawImage(const PdfImage& obj, double x, double y, double scaleX, double scaleY)
@@ -513,9 +540,11 @@ void PdfPainter::DrawImage(const PdfImage& obj, double x, double y, double scale
 void PdfPainter::DrawXObject(const PdfXObject& obj, double x, double y, double scaleX, double scaleY)
 {
     checkStream();
+    // NOTE: Pre-resolve throwable operations before emitting any stream operators
+    auto resName = tryAddResource(obj.GetObject(), PdfResourceType::XObject);
     PoDoFo::WriteOperator_q(m_stream);
     PoDoFo::WriteOperator_cm(m_stream, scaleX, 0, 0, scaleY, x, y);
-    PoDoFo::WriteOperator_Do(m_stream, tryAddResource(obj.GetObject(), PdfResourceType::XObject));
+    PoDoFo::WriteOperator_Do(m_stream, resName);
     PoDoFo::WriteOperator_Q(m_stream);
 }
 
@@ -631,6 +660,10 @@ void PdfPainter::BeginText()
 {
     checkStream();
     checkStatus(StatusDefault | StatusTextObject);
+    // NOTE: Pre-resolve throwable operations before emitting any stream operators
+    auto& textState = m_StateStack.Current->TextState;
+    if (textState.Font != nullptr)
+        tryAddResource(textState.Font->GetObject(), PdfResourceType::Font);
     PoDoFo::WriteOperator_BT(m_stream);
     enterTextObject();
     writeTextState();
@@ -650,7 +683,9 @@ void PdfPainter::AddText(const string_view& str)
     checkFont();
     auto expStr = this->expandTabs(str);
     auto& font = *m_StateStack.Current->TextState.Font;
-    PoDoFo::WriteOperator_Tj(m_stream, font.GetEncoding().ConvertToEncoded(expStr),
+    // NOTE: Pre-resolve throwable operations before emitting any stream operators
+    auto encoded = font.GetEncoding().ConvertToEncoded(expStr);
+    PoDoFo::WriteOperator_Tj(m_stream, encoded,
         !font.GetEncoding().IsSimpleEncoding());
 }
 
@@ -1011,6 +1046,38 @@ void PdfPainter::checkStream()
 
     PODOFO_RAISE_LOGIC_IF(m_canvas == nullptr, "Call SetCanvas() first before doing drawing operations");
     m_objStream = &m_canvas->GetOrCreateContentsStream((PdfStreamAppendFlags)(m_flags & (~PdfPainterFlags::NoSaveRestore)));
+
+    if (m_rotationPending)
+    {
+        // Emit the canvas rotation alignment as the first operator
+        PoDoFo::WriteOperator_cm(m_stream, m_rotation[0], m_rotation[1],
+            m_rotation[2], m_rotation[3], m_rotation[4], m_rotation[5]);
+        m_rotationPending = false;
+    }
+}
+
+void PdfPainter::initRotation()
+{
+    // By default the painter pre-sets a transformation that aligns supplied coordinates
+    // to the canonical (rotation normalized) frame of the canvas, so the caller can draw
+    // assuming the same frame as used in other parts of the API (e.g. text extraction or
+    // PdfCanvas::GetRect(). This relies on a clean baseline  graphics state, which the
+    // default Save/Restore of prior content guarantees. It is skipped with RawCoordinates
+    // (the caller wants raw page coordinates) or NoSaveRestorePrior (no clean baseline is
+    // established, caller is supposed to know the current situation of the content stream)
+    if ((m_flags & PdfPainterFlags::RawCoordinates) != PdfPainterFlags::None
+        || (m_flags & PdfPainterFlags::NoSaveRestorePrior) != PdfPainterFlags::None)
+    {
+        return;
+    }
+
+    double teta;
+    if (!m_canvas->TryGetRotationRadians(teta))
+        return;
+
+    m_rotation = GetFrameRotationTransformInverse((Rect)m_canvas->GetRectRaw(), teta);
+    m_StateStack.Current->GraphicsState.CTM = m_rotation;
+    m_rotationPending = true;
 }
 
 void PdfPainter::openPath(double x, double y)

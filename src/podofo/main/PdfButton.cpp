@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2007 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2007 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #include <podofo/private/PdfDeclarationsPrivate.h>
 #include "PdfButton.h"
@@ -114,10 +112,10 @@ bool PdfToggleButton::IsChecked() const
 void PdfToggleButton::SetAppearanceChecked(const PdfXObject& xobj)
 {
     // TODO: Correct export value support
-    MustGetWidget().PushAppearanceStream(xobj, PdfAppearanceType::Normal, "Yes"_n, false);
+    MustGetWidget().SetAppearanceStream(xobj, PdfSetAppearanceFlags::SkipSelectedState, PdfAppearanceType::Normal, "Yes"_n);
 }
 
 void PdfToggleButton::SetAppearanceUnchecked(const PdfXObject& xobj)
 {
-    MustGetWidget().PushAppearanceStream(xobj, PdfAppearanceType::Normal, "Off"_n, false);
+    MustGetWidget().SetAppearanceStream(xobj, PdfSetAppearanceFlags::SkipSelectedState, PdfAppearanceType::Normal, "Off"_n);
 }

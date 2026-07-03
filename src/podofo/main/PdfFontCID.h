@@ -1,8 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2007 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2020 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- */
+// SPDX-FileCopyrightText: 2007 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2020 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_FONT_CID_H
 #define PDF_FONT_CID_H
@@ -11,8 +9,7 @@
 
 namespace PoDoFo {
 
-/** A PdfFont that represents a CID-keyed font
- */
+/// A PdfFont that represents a CID-keyed font
 class PODOFO_API PdfFontCID : public PdfFont
 {
     friend class PdfFont;

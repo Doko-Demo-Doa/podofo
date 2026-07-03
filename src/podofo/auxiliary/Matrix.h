@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2021 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef AUX_MATRIX_H
 #define AUX_MATRIX_H
@@ -20,8 +17,7 @@ namespace PoDoFo
         static Matrix Identity;
 
     public:
-        /** Constructs an identity matrix
-         */
+        /// Constructs an identity matrix
         Matrix();
         Matrix(double a, double b, double c, double d, double e, double f);
 

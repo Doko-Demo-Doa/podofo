@@ -1,9 +1,6 @@
-/**
- * SPDX-FileCopyrightText: (C) 2007 Dominik Seichter <domseichter@web.de>
- * SPDX-FileCopyrightText: (C) 2021 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2007 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #ifndef PDF_ENCODING_PRIVATE_H
 #define PDF_ENCODING_PRIVATE_H
@@ -25,10 +22,9 @@ namespace PoDoFo
     constexpr unsigned ZapfDingbatsEncodingId     = 23;
     constexpr unsigned CustomEncodingStartId      = 101;
 
-    /** Check if the chars in the given utf-8 view are eligible for PdfDocEncofing conversion
-     *
-     * /param isPdfDocEncoding the given utf-8 string is coincident in PdfDocEncoding representation
-     */
+    /// Check if the chars in the given utf-8 view are eligible for PdfDocEncofing conversion
+    ///
+    /// @param isPdfDocEncoding the given utf-8 string is coincident in PdfDocEncoding representation
     bool CheckValidUTF8ToPdfDocEcondingChars(const std::string_view& view, bool& isAsciiEqual);
     bool IsPdfDocEncodingCoincidentToUTF8(std::string_view view);
     bool TryConvertUTF8ToPdfDocEncoding(const std::string_view& view, std::string& pdfdocencstr);
@@ -46,9 +42,7 @@ namespace PoDoFo
         CodePointMapNode* Right;
     };
 
-    /**
-     * Methods to maintain and query a reverse map from code points to code units
-     */
+    /// Methods to maintain and query a reverse map from code points to code units
 
     bool TryGetCodeReverseMap(const CodePointMapNode* root, const codepointview& codePoints, PdfCharCode& codeUnit);
     bool TryGetCodeReverseMap(const CodePointMapNode* root, codepoint codePoint, PdfCharCode& codeUnit);
@@ -57,9 +51,7 @@ namespace PoDoFo
     void PushMappingReverseMap(CodePointMapNode*& root, const codepointview& codePoints, const PdfCharCode& codeUnit);
     void DeleteNodeReverseMap(CodePointMapNode* node);
 
-    /**
-     * Low level serialization commodities
-     */
+    /// Low level serialization commodities
 
     void AppendCodeSpaceRangeTo(OutputStream& stream, const PdfCharCodeMap& charMap, charbuff& temp);
     void AppendCIDMappingEntriesTo(OutputStream& stream, const PdfCharCodeMap& charMap, charbuff& temp);

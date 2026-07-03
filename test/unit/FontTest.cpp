@@ -1,141 +1,16 @@
-/**
- * Copyright (C) 2009 by Dominik Seichter <domseichter@web.de>
- * Copyright (C) 2021 by Francesco Pretto <ceztko@gmail.com>
- *
- * Licensed under GNU Library General Public 2.0 or later.
- * Some rights reserved. See COPYING, AUTHORS.
- */
+// SPDX-FileCopyrightText: 2009 Dominik Seichter <domseichter@web.de>
+// SPDX-FileCopyrightText: 2021 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: MIT-0
 
 #include <PdfTest.h>
 
 #include <podofo/private/FreetypePrivate.h>
-#include <podofo/private/FontUtils.h>
+#ifdef PODOFO_ENABLE_AFDKO
+#include <podofo/private/FontUtilsAFDKO.h>
+#endif
 
 using namespace std;
 using namespace PoDoFo;
-
-#ifdef PODOFO_HAVE_FONTCONFIG
-
-#include <fontconfig/fontconfig.h>
-
-static bool getFontInfo(FcPattern* font, string& fontFamily, string& fontPath,
-    PdfFontStyle& style);
-static void testSingleFont(FcPattern* font);
-
-TEST_CASE("TestFontConfigMatch")
-{
-    // Create a simple platform invariant FC config
-    string fontconf =
-        R"(<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-<fontconfig>
-    <dir>FONT_DIR</dir>
-    <dir prefix="xdg">fonts</dir>
-    <cachedir>FONT_CACHE_DIR</cachedir>
-    <cachedir prefix="xdg">fontconfig</cachedir>
-</fontconfig>
-)";
-
-    utls::Replace(fontconf, "FONT_DIR", TestUtils::GetTestInputFilePath("Fonts"));
-    utls::Replace(fontconf, "FONT_CACHE_DIR", TestUtils::GetTestOutputFilePath("TestFontConfig"));
-
-    PdfFontManager::SetFontConfigWrapper(std::make_shared<PdfFontConfigWrapper>(fontconf));
-
-    {
-        PdfFontSearchParams parmas;
-
-        auto metrics = PdfFontManager::SearchFontMetrics("NotoSans-Regular", parmas);
-        REQUIRE(metrics->GetFontName() == "NotoSans-Regular");
-
-        metrics = PdfFontManager::SearchFontMetrics("LiberationSans", parmas);
-        REQUIRE(metrics->GetFontName() == "LiberationSans");
-
-        metrics = PdfFontManager::SearchFontMetrics("Liberation Sans", parmas);
-        REQUIRE(metrics->GetFontName() == "LiberationSans");
-
-        metrics = PdfFontManager::SearchFontMetrics("LiberationMono", parmas);
-        REQUIRE(metrics->GetFontName() == "LiberationMono");
-
-        parmas.Style = PdfFontStyle::Italic;
-        metrics = PdfFontManager::SearchFontMetrics("LiberationSans", parmas);
-        REQUIRE(metrics->GetFontName() == "LiberationSans-Italic");
-
-        parmas.Style = PdfFontStyle::Bold;
-        metrics = PdfFontManager::SearchFontMetrics("Noto Sans", parmas);
-        REQUIRE(metrics->GetFontName() == "NotoSans-Bold");
-
-        parmas.MatchBehavior |= PdfFontMatchBehaviorFlags::SkipMatchPostScriptName;
-        metrics = PdfFontManager::SearchFontMetrics("LiberationSans", parmas);
-        REQUIRE(metrics->GetFontName() == "LiberationSans-Bold");
-    }
-}
-
-TEST_CASE("TestConversionPBF2CFF")
-{
-    {
-        charbuff font1;
-        utls::ReadTo(font1, TestUtils::GetTestInputFilePath("FontsType1", "Lato-Regular.pfb"));
-
-        charbuff cff;
-        PoDoFo::ConvertFontType1ToCFF(font1, cff);
-
-        TestUtils::IsBufferEqual(cff, TestUtils::GetTestInputFilePath("FontsType1", "ConvCFF", "Lato-Regular.cff"));
-    }
-
-    {
-        charbuff font1;
-        utls::ReadTo(font1, TestUtils::GetTestInputFilePath("FontsType1", "lmb10.pfb"));
-
-        charbuff cff;
-        PoDoFo::ConvertFontType1ToCFF(font1, cff);
-
-        TestUtils::IsBufferEqual(cff, TestUtils::GetTestInputFilePath("FontsType1", "ConvCFF", "lmb10.cff"));
-    }
-}
-
-TEST_CASE("TestSubsetCFFDegenerate")
-{
-    charbuff font1;
-    utls::ReadTo(font1, TestUtils::GetTestInputFilePath("FontsType1", "Degenerate1Glyph.cff"));
-    auto metrics = PdfFontMetrics::CreateFromBuffer(font1);
-
-    vector<PdfCharGIDInfo> subsetInfos;
-    subsetInfos.push_back({ 1, 1, PdfGID(0, 0)});
-
-    PdfCIDSystemInfo cidInfo;
-    cidInfo.Registry = PdfString("Adobe");
-    cidInfo.Ordering = PdfString("Test");
-    cidInfo.Supplement = 0;
-
-    charbuff cff;
-    PoDoFo::SubsetFontCFF(*metrics, subsetInfos, cidInfo, cff);
-
-    TestUtils::IsBufferEqual(cff, TestUtils::GetTestInputFilePath("FontsType1", "SubsetDegenerate1Glyph.cff"));
-}
-
-// Disable load all fonts for now
-TEST_CASE("TestFonts", "[.]")
-{
-    // Get all installed fonts
-    auto pattern = FcPatternCreate();
-    auto objectSet = FcObjectSetBuild(FC_FAMILY, FC_STYLE, FC_FILE, FC_SLANT, FC_WEIGHT, nullptr);
-    auto fontSet = FcFontList(nullptr, pattern, objectSet);
-
-    FcObjectSetDestroy(objectSet);
-    FcPatternDestroy(pattern);
-
-    if (fontSet == nullptr)
-    {
-        INFO("Unable to search for fonts");
-        return;
-    }
-
-    INFO(utls::Format("Testing {} fonts", fontSet->nfont));
-    for (int i = 0; i < fontSet->nfont; i++)
-        testSingleFont(fontSet->fonts[i]);
-
-    FcFontSetDestroy(fontSet);
-}
 
 TEST_CASE("TestEmbedFont")
 {
@@ -241,6 +116,101 @@ TEST_CASE("TestCreateFontExtract")
     REQUIRE(entries[1].Y == 500);
 }
 
+TEST_CASE("TestGetOrCreateFontAfterEmbedAndReset")
+{
+    auto fontPath = TestUtils::GetTestInputFilePath("Fonts", "LiberationSans-Regular.ttf");
+
+    PdfMemDocument doc;
+    auto& font1 = doc.GetFonts().GetOrCreateFont(fontPath);
+    REQUIRE(font1.GetMetrics().GetFontName() == "LiberationSans");
+
+    doc.GetFonts().EmbedFonts();
+    doc.Reset();
+
+    auto& font2 = doc.GetFonts().GetOrCreateFont(fontPath);
+    REQUIRE(font2.GetMetrics().GetFontName() == "LiberationSans");
+}
+
+#ifdef PODOFO_HAVE_FONTCONFIG
+
+#include <fontconfig/fontconfig.h>
+
+static bool getFontInfo(FcPattern* font, string& fontFamily, string& fontPath,
+    PdfFontStyle& style);
+static void testSingleFont(FcPattern* font);
+
+TEST_CASE("TestFontConfigMatch")
+{
+    // Create a simple platform invariant FC config
+    string fontconf =
+        R"(<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+    <dir>FONT_DIR</dir>
+    <dir prefix="xdg">fonts</dir>
+    <cachedir>FONT_CACHE_DIR</cachedir>
+    <cachedir prefix="xdg">fontconfig</cachedir>
+</fontconfig>
+)";
+
+    utls::Replace(fontconf, "FONT_DIR", TestUtils::GetTestInputFilePath("Fonts"));
+    utls::Replace(fontconf, "FONT_CACHE_DIR", TestUtils::GetTestOutputFilePath("TestFontConfig"));
+
+    PdfFontManager::SetFontConfigWrapper(std::make_shared<PdfFontConfigWrapper>(fontconf));
+
+    {
+        PdfFontSearchParams parmas;
+
+        auto metrics = PdfFontManager::SearchFontMetrics("NotoSans-Regular", parmas);
+        REQUIRE(metrics->GetFontName() == "NotoSans-Regular");
+
+        metrics = PdfFontManager::SearchFontMetrics("LiberationSans", parmas);
+        REQUIRE(metrics->GetFontName() == "LiberationSans");
+
+        metrics = PdfFontManager::SearchFontMetrics("Liberation Sans", parmas);
+        REQUIRE(metrics->GetFontName() == "LiberationSans");
+
+        metrics = PdfFontManager::SearchFontMetrics("LiberationMono", parmas);
+        REQUIRE(metrics->GetFontName() == "LiberationMono");
+
+        parmas.Style = PdfFontStyle::Italic;
+        metrics = PdfFontManager::SearchFontMetrics("LiberationSans", parmas);
+        REQUIRE(metrics->GetFontName() == "LiberationSans-Italic");
+
+        parmas.Style = PdfFontStyle::Bold;
+        metrics = PdfFontManager::SearchFontMetrics("Noto Sans", parmas);
+        REQUIRE(metrics->GetFontName() == "NotoSans-Bold");
+
+        parmas.MatchBehavior |= PdfFontMatchBehaviorFlags::SkipMatchPostScriptName;
+        metrics = PdfFontManager::SearchFontMetrics("LiberationSans", parmas);
+        REQUIRE(metrics->GetFontName() == "LiberationSans-Bold");
+    }
+}
+
+// Disable load all fonts for now
+TEST_CASE("TestFonts", "[.]")
+{
+    // Get all installed fonts
+    auto pattern = FcPatternCreate();
+    auto objectSet = FcObjectSetBuild(FC_FAMILY, FC_STYLE, FC_FILE, FC_SLANT, FC_WEIGHT, nullptr);
+    auto fontSet = FcFontList(nullptr, pattern, objectSet);
+
+    FcObjectSetDestroy(objectSet);
+    FcPatternDestroy(pattern);
+
+    if (fontSet == nullptr)
+    {
+        INFO("Unable to search for fonts");
+        return;
+    }
+
+    INFO(utls::Format("Testing {} fonts", fontSet->nfont));
+    for (int i = 0; i < fontSet->nfont; i++)
+        testSingleFont(fontSet->fonts[i]);
+
+    FcFontSetDestroy(fontSet);
+}
+
 void testSingleFont(FcPattern* font)
 {
     PdfMemDocument doc;
@@ -303,3 +273,50 @@ bool getFontInfo(FcPattern* font, string& fontFamily, string& fontPath,
 }
 
 #endif // PODOFO_HAVE_FONTCONFIG
+
+#ifdef PODOFO_ENABLE_AFDKO
+
+TEST_CASE("TestConversionPBF2CFF")
+{
+    {
+        charbuff font1;
+        utls::ReadTo(font1, TestUtils::GetTestInputFilePath("FontsType1", "Lato-Regular.pfb"));
+
+        charbuff cff;
+        afdko::ConvertFontType1ToCFF(font1, cff);
+
+        TestUtils::IsBufferEqual(cff, TestUtils::GetTestInputFilePath("FontsType1", "ConvCFF", "Lato-Regular.cff"));
+    }
+
+    {
+        charbuff font1;
+        utls::ReadTo(font1, TestUtils::GetTestInputFilePath("FontsType1", "lmb10.pfb"));
+
+        charbuff cff;
+        afdko::ConvertFontType1ToCFF(font1, cff);
+
+        TestUtils::IsBufferEqual(cff, TestUtils::GetTestInputFilePath("FontsType1", "ConvCFF", "lmb10.cff"));
+    }
+}
+
+TEST_CASE("TestSubsetCFFDegenerate")
+{
+    charbuff font1;
+    utls::ReadTo(font1, TestUtils::GetTestInputFilePath("FontsType1", "Degenerate1Glyph.cff"));
+    auto metrics = PdfFontMetrics::CreateFromBuffer(font1);
+
+    vector<PdfCharGIDInfo> subsetInfos;
+    subsetInfos.push_back({ 1, 1, PdfGID(0, 0) });
+
+    PdfCIDSystemInfo cidInfo;
+    cidInfo.Registry = PdfString("Adobe");
+    cidInfo.Ordering = PdfString("Test");
+    cidInfo.Supplement = 0;
+
+    charbuff cff;
+    afdko::SubsetFontCFF(*metrics, subsetInfos, cidInfo, cff);
+
+    TestUtils::IsBufferEqual(cff, TestUtils::GetTestInputFilePath("FontsType1", "SubsetDegenerate1Glyph.cff"));
+}
+
+#endif // PODOFO_ENABLE_AFDKO

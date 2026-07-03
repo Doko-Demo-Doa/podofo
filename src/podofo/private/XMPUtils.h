@@ -1,8 +1,5 @@
-/**
- * SPDX-FileCopyrightText: (C) 2022 Francesco Pretto <ceztko@gmail.com>
- * SPDX-License-Identifier: LGPL-2.0-or-later
- * SPDX-License-Identifier: MPL-2.0
- */
+// SPDX-FileCopyrightText: 2022 Francesco Pretto <ceztko@gmail.com>
+// SPDX-License-Identifier: LGPL-2.0-or-later OR MPL-2.0
 
 #pragma once
 
@@ -38,9 +35,7 @@ namespace PoDoFo
         InvalidPrefix = 4
     };
 
-    /**
-     * \remarks the store is not cleared: the function sets only read properties
-     */
+    /// @remarks the store is not cleared: the function sets only read properties
     void GetXMPMetadata(xmlNodePtr description, PdfMetadataStore& metadata);
     void SetXMPMetadata(xmlDocPtr doc, xmlNodePtr description, const PdfMetadataStore& metadata);
     void PruneAndValidate(xmlDocPtr doc, xmlNodePtr description, PdfALevel level,
