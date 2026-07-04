@@ -41,31 +41,22 @@
 #include <utility>
 
 #include <podofo/podofo.h>
-#include <openssl/bio.h>
-#include <openssl/x509.h>
-#include <openssl/x509v3.h>
-#include <openssl/ocsp.h>
-#include <openssl/ts.h>
-#include <openssl/pkcs7.h>
-#include <openssl/err.h>
+
+// Deliberately no <openssl/...> includes here: this is a PUBLIC header
+// (installed alongside the rest of podofo/main), and OpenSSL is linked
+// PRIVATE to the podofo library target (see root CMakeLists.txt) — same
+// reason PdfSignerCms.h/CmsContext.h forward-declare OpenSSL types instead
+// of including their headers. Any OpenSSL type actually needed here would
+// leak that private dependency into every consumer of <podofo/podofo.h>
+// (this broke the plain library-consumer builds: examples/tools don't get
+// OpenSSL's include path, only the podofo library target itself does).
+// The one OpenSSL type this header used to reference (BIO, via BioFreeAll/
+// BioPtr) was pure implementation detail with no public API surface, so it
+// moved into PdfRemoteSignDocumentSession.cpp instead of being forward-declared.
 
 namespace fs = std::filesystem;
 
 namespace PoDoFo {
-
-    /**
-     * @brief RAII deleter for OpenSSL `BIO*` chains created via BIO_push.
-     *
-     * Intended for use with `std::unique_ptr<BIO, BioFreeAll>` to ensure `BIO_free_all`
-     * is called exactly once in all exit paths.
-     */
-    struct PODOFO_API BioFreeAll {
-        void operator()(BIO* b) const noexcept;
-    };
-    /**
-     * @brief Convenience alias for a unique BIO with `BIO_free_all` deleter.
-     */
-    using BioPtr = std::unique_ptr<BIO, BioFreeAll>;
 
     /**
      * @brief Container for validation-related artifacts to embed into the PDF DSS.

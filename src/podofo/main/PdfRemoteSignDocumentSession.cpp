@@ -29,12 +29,16 @@ namespace fs = std::filesystem;
 // the attribute is attached via the generic AddAttribute() API instead.
 static const char* SIGNATURE_TIME_STAMP_TOKEN_OID = "1.2.840.113549.1.9.16.2.14";
 
-/**
- * @brief Deleter implementation; frees a BIO chain with BIO_free_all
- * @param b Pointer to the BIO chain to free
- */
-void PoDoFo::BioFreeAll::operator()(BIO* b) const noexcept {
-    if (b) BIO_free_all(b);
+namespace {
+    // RAII deleter for OpenSSL BIO chains created via BIO_push(). Kept out of the
+    // public header (unlike the reference this was ported from) since OpenSSL is a
+    // private implementation dependency of this file, not part of the public API.
+    struct BioFreeAll {
+        void operator()(BIO* b) const noexcept {
+            if (b) BIO_free_all(b);
+        }
+    };
+    using BioPtr = std::unique_ptr<BIO, BioFreeAll>;
 }
 
 /**
@@ -226,7 +230,7 @@ std::vector<unsigned char> PoDoFo::PdfRemoteSignDocumentSession::ConvertBase64PE
     }
 
     BIO* raw_chain = BIO_push(raw_b64, raw_mem);
-    PoDoFo::BioPtr bio(raw_chain);
+    BioPtr bio(raw_chain);
 
     std::vector<unsigned char> der((base64PEM->size() * 3) / 4);
     int len = BIO_read(bio.get(), der.data(), static_cast<int>(der.size()));
@@ -240,7 +244,7 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::ToBase64(const PoDoFo::charbuf
     BIO* raw_b64 = BIO_new(BIO_f_base64()); BIO_set_flags(raw_b64, BIO_FLAGS_BASE64_NO_NL);
     BIO* raw_mem = BIO_new(BIO_s_mem());
     BIO* raw_chain = BIO_push(raw_b64, raw_mem);
-    PoDoFo::BioPtr bio(raw_chain);
+    BioPtr bio(raw_chain);
 
     if (BIO_write(bio.get(), data.data(), static_cast<int>(data.size())) <= 0 ||
         BIO_flush(bio.get()) <= 0)
@@ -255,7 +259,7 @@ PoDoFo::charbuff PoDoFo::PdfRemoteSignDocumentSession::ConvertDSSHashToSignedHas
     BIO* raw_b64 = BIO_new(BIO_f_base64()); BIO_set_flags(raw_b64, BIO_FLAGS_BASE64_NO_NL);
     BIO* raw_mem = BIO_new_mem_buf(DSSHash.data(), static_cast<int>(DSSHash.size()));
     BIO* raw_chain = BIO_push(raw_b64, raw_mem);
-    PoDoFo::BioPtr bio(raw_chain);
+    BioPtr bio(raw_chain);
 
     std::vector<unsigned char> decoded(128);
     int len = BIO_read(bio.get(), decoded.data(), static_cast<int>(decoded.size()));
