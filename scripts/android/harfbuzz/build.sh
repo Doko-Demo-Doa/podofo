@@ -76,6 +76,13 @@ function build() {
     # Create directories if they don't exist
     mkdir -p "$BUILD_DIR" "$INSTALL_DIR"
 
+    # NDK's own toolchain file (used below via CMAKE_TOOLCHAIN_FILE) has built-in
+    # ccache support via ANDROID_CCACHE, unlike brotli's hand-rolled toolchain file.
+    CCACHE_CMAKE_ARGS=()
+    if [ -n "$CCACHE_BIN" ]; then
+        CCACHE_CMAKE_ARGS=(-DANDROID_CCACHE="$CCACHE_BIN")
+    fi
+
     # Build for each architecture
     for ABI in "${ARCHS[@]}"; do
         echo "Building for $ABI..."
@@ -125,8 +132,9 @@ function build() {
             -DHB_BUILD_UTILS=OFF \
             -DHB_BUILD_SUBSET=OFF \
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
-            -DCMAKE_EXE_LINKER_FLAGS="-Wl,-z,max-page-size=16384"
-        
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
+            "${CCACHE_CMAKE_ARGS[@]}"
+
         # Build and install
         make -j$NPROC
         make install

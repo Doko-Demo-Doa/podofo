@@ -129,8 +129,8 @@ function build() {
         
         # Set up compiler and tools
         TOOLCHAIN="$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG"
-        CC="$TOOLCHAIN/bin/${HOST}${API_LEVEL}-clang"
-        CXX="$TOOLCHAIN/bin/${HOST}${API_LEVEL}-clang++"
+        CC="$(with_ccache "$TOOLCHAIN/bin/${HOST}${API_LEVEL}-clang")"
+        CXX="$(with_ccache "$TOOLCHAIN/bin/${HOST}${API_LEVEL}-clang++")"
         AR="$TOOLCHAIN/bin/llvm-ar"
         RANLIB="$TOOLCHAIN/bin/llvm-ranlib"
         STRIP="$TOOLCHAIN/bin/llvm-strip"

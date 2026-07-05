@@ -65,3 +65,27 @@ sed_i() {
         sed -i "$@"
     fi
 }
+
+# Wrap the NDK's clang/clang++ with ccache when it's installed (eg. via
+# hendrikmuhs/ccache-action in CI), so repeated cross-compiles of unchanged
+# sources can skip recompilation. This matters more than usual here: PoDoFo's
+# build.sh does a fresh `rsync` of the source tree before each build, which
+# resets file mtimes and defeats make/ninja's own incremental rebuild even
+# when the content is unchanged. No-op (returns the path unchanged) if ccache
+# isn't on PATH. Used for Makefile/autotools-based builds, which just need
+# "ccache <path>" prefixed onto $CC/$CXX; CMake-based builds need a different
+# mechanism (CMAKE_<LANG>_COMPILER_LAUNCHER, or NDK's own ANDROID_CCACHE) since
+# CMAKE_C_COMPILER must be a single executable path, not "ccache <path>".
+if command -v ccache >/dev/null 2>&1; then
+    CCACHE_BIN="ccache"
+else
+    CCACHE_BIN=""
+fi
+
+with_ccache() {
+    if [ -n "$CCACHE_BIN" ]; then
+        echo "$CCACHE_BIN $1"
+    else
+        echo "$1"
+    fi
+}

@@ -77,6 +77,16 @@ function build() {
     # Create directories if they don't exist
     mkdir -p "$BUILD_DIR" "$INSTALL_DIR"
 
+    # NDK's own toolchain file (used below via CMAKE_TOOLCHAIN_FILE) has built-in
+    # ccache support via ANDROID_CCACHE. This matters most for PoDoFo specifically:
+    # prepare() does a fresh `rsync` of the source tree before every build, which
+    # resets file mtimes and defeats CMake/ninja's own incremental rebuild even
+    # when the source content hasn't changed.
+    CCACHE_CMAKE_ARGS=()
+    if [ -n "$CCACHE_BIN" ]; then
+        CCACHE_CMAKE_ARGS=(-DANDROID_CCACHE="$CCACHE_BIN")
+    fi
+
     echo "Configuring PoDoFo..."
 
     # Build for each architecture
@@ -120,7 +130,8 @@ function build() {
             -DCMAKE_CXX_FLAGS="-I$LIBXML2_DIR/$ABI/include -I$FREETYPE_DIR/$ABI/include -I$LIBPNG_DIR/$ABI/include -I$OPENSSL_DIR/$ABI/include" \
             -DCMAKE_C_FLAGS="-fPIC" \
             -DCMAKE_SHARED_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
-            -DCMAKE_EXE_LINKER_FLAGS="-Wl,-z,max-page-size=16384"
+            -DCMAKE_EXE_LINKER_FLAGS="-Wl,-z,max-page-size=16384" \
+            "${CCACHE_CMAKE_ARGS[@]}"
 
         # Build and install
         cmake --build . --target install -- -j"$NPROC"

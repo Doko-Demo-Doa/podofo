@@ -104,8 +104,8 @@ function build() {
         esac
         
         # Set up compiler and tools
-        CC="$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG/bin/${HOST}${API_LEVEL}-clang"
-        CXX="$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG/bin/${HOST}${API_LEVEL}-clang++"
+        CC="$(with_ccache "$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG/bin/${HOST}${API_LEVEL}-clang")"
+        CXX="$(with_ccache "$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG/bin/${HOST}${API_LEVEL}-clang++")"
         AR="$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG/bin/llvm-ar"
         RANLIB="$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG/bin/llvm-ranlib"
         STRIP="$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG/bin/llvm-strip"

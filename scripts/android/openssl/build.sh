@@ -94,7 +94,7 @@ function build() {
     for i in "${!ARCHS[@]}"; do
         ABI="${ARCHS[$i]}"
         TARGET="${TARGETS[$i]}"
-        CC="${COMPILERS[$i]}"
+        CC="$(with_ccache "${COMPILERS[$i]}")"
         CXX="${CC}++"
         
         echo "Building for $ABI..."

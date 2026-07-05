@@ -54,6 +54,18 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y autoconf automake libtool pkg-config rsync build-essential
 
+      # Speeds up recompiles of unchanged sources across runs — most valuable for
+      # PoDoFo itself, whose build.sh isn't gated by the dependency cache below
+      # and does a fresh `rsync` of the source tree every run (resets file mtimes,
+      # defeating CMake/ninja's own incremental rebuild even when content matches).
+      # scripts/android/common.sh wires CC/CXX (or ANDROID_CCACHE/CMAKE_*_LAUNCHER
+      # for CMake-based dependencies) through ccache whenever it's on PATH.
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2.23
+        with:
+          key: android-ndk-${{ env.NDK_VERSION }}
+          max-size: 2G
+
       # Building all 8 native dependencies for all 4 ABIs from source is the
       # slowest part of this pipeline (~40-90 min cold). Cache it, keyed on
       # the scripts that produce it (any version bump or fix invalidates the

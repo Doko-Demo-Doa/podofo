@@ -144,6 +144,15 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 EOF
+        # CMAKE_C_COMPILER must be a single executable path (not "ccache clang"),
+        # so ccache is wired in via the separate _LAUNCHER variable instead of
+        # wrapping $CC/$CXX like the Makefile/autotools-based dependencies do.
+        if [ -n "$CCACHE_BIN" ]; then
+            cat >> android.toolchain.cmake << EOF
+set(CMAKE_C_COMPILER_LAUNCHER $CCACHE_BIN)
+set(CMAKE_CXX_COMPILER_LAUNCHER $CCACHE_BIN)
+EOF
+        fi
 
         cmake .. \
             -DCMAKE_TOOLCHAIN_FILE=android.toolchain.cmake \
