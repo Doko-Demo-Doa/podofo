@@ -1,0 +1,116 @@
+name: build-android
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'src/podofo/**'
+      - 'src/wrapper/**'
+      - 'src/android/**'
+      - 'scripts/android/**'
+      - '.github/workflows/build-android.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'src/podofo/**'
+      - 'src/wrapper/**'
+      - 'src/android/**'
+      - 'scripts/android/**'
+      - '.github/workflows/build-android.yml'
+  workflow_dispatch:
+
+env:
+  NDK_VERSION: 27.2.12479018
+
+jobs:
+  build-android-aar:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Set up Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1.6.0
+        with:
+          ndk-version: ${{ env.NDK_VERSION }}
+          add-to-path: false
+
+      - name: Install native dependency build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake libtool pkg-config rsync build-essential
+
+      # Building all 8 native dependencies for all 4 ABIs from source is the
+      # slowest part of this pipeline (~40-90 min cold). Cache it, keyed on
+      # the scripts that produce it (any version bump or fix invalidates the
+      # cache automatically) and the NDK version (a toolchain change should
+      # rebuild everything too).
+      - name: Cache Android native dependencies
+        id: cache-deps
+        uses: actions/cache@v6
+        with:
+          path: build/android
+          key: android-deps-${{ env.NDK_VERSION }}-${{ hashFiles('scripts/android/**') }}
+
+      - name: Build native dependencies (brotli, bzip2, freetype, libpng, libxml2, openssl, harfbuzz, zlib)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: scripts/android/build_deps.sh "$ANDROID_NDK_HOME" build/android
+
+      - name: Cross-compile PoDoFo for Android (all 4 ABIs)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          scripts/android/podofo/build.sh "$ANDROID_NDK_HOME" build/android/podofo \
+              build/android/freetype/install build/android/libpng/install \
+              build/android/libxml2/install build/android/openssl/install
+
+      - name: Organize native libs for linking
+        run: |
+          scripts/android/podofo-aar/organize_libs.sh \
+              build/android/brotli/install build/android/bzip2/install \
+              build/android/freetype/install build/android/harfbuzz/install \
+              build/android/libpng/install build/android/libxml2/install \
+              build/android/openssl/install build/android/podofo/install \
+              build/android/zlib/install build/android/aar
+
+      - name: Link JNI shared library per ABI
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: scripts/android/podofo-aar/build.sh "$ANDROID_NDK_HOME" src/wrapper build/android/aar
+
+      - name: Copy native libs into jniLibs
+        run: |
+          mkdir -p src/android/src/main/jniLibs
+          cp -r build/android/aar/build/jni/* src/android/src/main/jniLibs/
+
+      - name: Verify JNI symbols survived
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          "$ANDROID_NDK_HOME"/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm -D \
+              src/android/src/main/jniLibs/arm64-v8a/libpodofo.so | grep Java_com_podofo_android
+
+      - name: Build AAR
+        working-directory: src/android
+        run: ./gradlew build
+
+      - name: Verify AAR contents
+        run: unzip -l src/android/build/outputs/aar/*.aar | grep -E '\.so$|classes\.jar'
+
+      - name: Upload AAR artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: podofo-android-aar
+          path: src/android/build/outputs/aar/*.aar
