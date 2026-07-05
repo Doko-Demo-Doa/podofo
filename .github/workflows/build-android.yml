@@ -20,7 +20,11 @@ on:
   workflow_dispatch:
 
 env:
-  NDK_VERSION: 27.2.12479018
+  # nttld/setup-ndk downloads from dl.google.com using Google's "rXXy" release
+  # name, not the numeric package revision (27.2.12479018) reported by
+  # `sdkmanager`/`source.properties` for the same release.
+  # https://github.com/android/ndk/releases#release-r27d
+  NDK_VERSION: r27c
 
 jobs:
   build-android-aar:
