@@ -187,6 +187,15 @@ void PdfSignerCms::ReserveAttributeSize(unsigned attrSize)
     m_reservedSize += (attrSize + 40);
 }
 
+void PdfSignerCms::AddCertificate(const bufferview& cert)
+{
+    // Stored and re-applied in resetContext(), since the underlying
+    // CmsContext (and its CMS structure) is recreated on every Reset()
+    m_chainCertificates.emplace_back(cert);
+    if (m_cmsContext != nullptr)
+        m_cmsContext->AddCertificate(cert);
+}
+
 unsigned PdfSignerCms::GetSignedHashSize() const
 {
     const_cast<PdfSignerCms&>(*this).ensureContextInitialized();
@@ -385,6 +394,9 @@ void PdfSignerCms::resetContext()
     }
 
     m_cmsContext->Reset(m_certificate, params);
+
+    for (auto& chainCert : m_chainCertificates)
+        m_cmsContext->AddCertificate(chainCert);
 }
 
 void PdfSignerCms::doSign(const bufferview& input, charbuff& output)

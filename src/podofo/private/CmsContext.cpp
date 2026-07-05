@@ -128,6 +128,37 @@ void CmsContext::AddAttribute(const string_view& nid, const bufferview& attr, bo
     }
 }
 
+void CmsContext::AddCertificate(const bufferview& cert)
+{
+    if (m_cms == nullptr)
+    {
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidHandle,
+            "The CMS context must be initialized before adding extra certificates");
+    }
+
+    auto in = (const unsigned char*)cert.data();
+    X509* x509 = d2i_X509(nullptr, &in, (int)cert.size());
+    if (x509 == nullptr)
+    {
+        unique_ptr<BIO, decltype(&BIO_free)> bio(BIO_new_mem_buf(cert.data(), (int)cert.size()), BIO_free);
+        if (bio != nullptr)
+            x509 = PEM_read_bio_X509(bio.get(), nullptr, nullptr, nullptr);
+
+        if (x509 == nullptr)
+        {
+            string err("Certificate loading failed. Internal OpenSSL error:\n");
+            ssl::GetOpenSSLError(err);
+            PODOFO_RAISE_ERROR_INFO(PdfErrorCode::OpenSSLError, err);
+        }
+    }
+
+    // CMS_add1_cert up-refs the certificate: it doesn't take ownership of our copy
+    int rc = CMS_add1_cert(m_cms, x509);
+    X509_free(x509);
+    if (rc <= 0)
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::OpenSSLError, "CMS_add1_cert");
+}
+
 void CmsContext::Dump(xmlNodePtr ctxElem, string& temp)
 {
     PODOFO_ASSERT(m_status == CmsContextStatus::ComputedHash);

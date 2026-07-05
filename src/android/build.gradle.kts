@@ -1,0 +1,75 @@
+
+object Meta {
+    const val BASE_URL = "https://github.com/Doko-Demo-Doa/podofo"
+}
+
+plugins {
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.maven.publish)
+}
+
+android {
+    namespace = "com.podofo.android"
+    compileSdk = 34
+
+    // Must match the NDK actually used to cross-compile the .so's dropped into
+    // jniLibs/ (scripts/android/, pinned to r27c / 27.2.12479018 — see
+    // .github/workflows/build-android.yml). AGP's own default ndkVersion (28.x
+    // as of AGP 9.1) is unrelated to that build and typically isn't installed,
+    // which makes AGP silently skip debug-symbol stripping (no strip tool found
+    // for that NDK) and package unstripped, much larger .so's instead.
+    ndkVersion = "27.2.12479018"
+
+    defaultConfig {
+        minSdk = 26
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.toVersion(libs.versions.java.get())
+        targetCompatibility = JavaVersion.toVersion(libs.versions.java.get())
+    }
+}
+
+dependencies {
+    implementation(libs.appcompat)
+}
+
+mavenPublishing {
+    pom {
+        name.set(project.name)
+        description.set("Customized PoDoFo library for Android")
+        url.set(Meta.BASE_URL)
+
+        ciManagement {
+            system = "github"
+            url = Meta.BASE_URL + "/actions"
+        }
+        licenses {
+            license {
+                name.set("The Apache License, Version 2.0")
+                url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+            }
+        }
+        developers {
+            developer {
+                id.set("Doko-Demo-Doa")
+                name.set("Doko Demo Doa")
+                url.set("https://github.com/Doko-Demo-Doa")
+            }
+        }
+        scm {
+            connection.set("scm:git:" + Meta.BASE_URL + ".git")
+            developerConnection.set("scm:git:ssh://git@github.com" + Meta.BASE_URL.substringAfter("https://github.com") + ".git")
+            url.set(Meta.BASE_URL)
+        }
+    }
+}

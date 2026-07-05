@@ -196,7 +196,7 @@ void utls::NavigateDescendantElements(xmlNodePtr element, const string_view& ns,
 
 bool utls::TrySerializeXmlDocTo(string& str, xmlDocPtr doc)
 {
-    auto ctx = xmlSaveToIO(xmlOutputStringWriter, xmlOutputStringWriterClose, &str, nullptr, XML_SAVE_NO_DECL | XML_SAVE_FORMAT);
+    auto ctx = xmlSaveToIO(xmlOutputStringWriter, xmlOutputStringWriterClose, &str, nullptr, (int)(XML_SAVE_NO_DECL | XML_SAVE_FORMAT));
     if (ctx == nullptr || xmlSaveDoc(ctx, doc) == -1 || xmlSaveClose(ctx) == -1)
         return false;
 

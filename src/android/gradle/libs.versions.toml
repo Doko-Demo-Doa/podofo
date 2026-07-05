@@ -1,0 +1,12 @@
+[versions]
+java = "17"
+agp = "9.1.1"
+appcompat = "1.6.1"
+maven-publish = "0.37.0"
+
+[libraries]
+appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+
+[plugins]
+android-library = { id = "com.android.library", version.ref = "agp" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }

@@ -45,6 +45,9 @@ namespace PoDoFo
         void ComputeHashToSign(charbuff& hashToSign);
         void ComputeSignature(const bufferview& signedHash, charbuff& signature);
         void AddAttribute(const std::string_view& nid, const bufferview& attr, bool signedAttr, bool octetString);
+        /// Add an extra X.509 certificate (DER or PEM) to the CMS "certificates" collection,
+        /// without making it a signer (eg. to embed the intermediate/chain certificates)
+        void AddCertificate(const bufferview& cert);
         void Dump(xmlNodePtr elem, std::string& temp);
         void Restore(xmlNodePtr elem, charbuff& temp);
         unsigned GetSignedHashSize() const;
