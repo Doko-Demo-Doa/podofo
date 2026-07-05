@@ -111,7 +111,11 @@ jobs:
         run: ./gradlew build
 
       - name: Verify AAR contents
-        run: unzip -l src/android/build/outputs/aar/*.aar | grep -E '\.so$|classes\.jar'
+        run: |
+          for aar in src/android/build/outputs/aar/*.aar; do
+            echo "=== $aar ==="
+            unzip -l "$aar" | grep -E '\.so$|classes\.jar'
+          done
 
       - name: Upload AAR artifact
         uses: actions/upload-artifact@v7

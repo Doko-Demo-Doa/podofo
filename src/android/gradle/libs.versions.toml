@@ -1,8 +1,8 @@
 [versions]
 java = "17"
-agp = "8.9.1"
+agp = "9.1.1"
 appcompat = "1.6.1"
-maven-publish = "0.32.0"
+maven-publish = "0.37.0"
 
 [libraries]
 appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }

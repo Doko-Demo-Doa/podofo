@@ -12,6 +12,14 @@ android {
     namespace = "com.podofo.android"
     compileSdk = 34
 
+    // Must match the NDK actually used to cross-compile the .so's dropped into
+    // jniLibs/ (scripts/android/, pinned to r27c / 27.2.12479018 — see
+    // .github/workflows/build-android.yml). AGP's own default ndkVersion (28.x
+    // as of AGP 9.1) is unrelated to that build and typically isn't installed,
+    // which makes AGP silently skip debug-symbol stripping (no strip tool found
+    // for that NDK) and package unstripped, much larger .so's instead.
+    ndkVersion = "27.2.12479018"
+
     defaultConfig {
         minSdk = 26
     }
