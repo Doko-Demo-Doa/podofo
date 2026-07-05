@@ -43,6 +43,22 @@ dependencies {
     implementation(libs.appcompat)
 }
 
+// Publishes alongside (not instead of) the mavenPublishing {} block below, which
+// targets Maven Central. Credentials come from Gradle properties or env vars named
+// after the repository ("GitHubPackages" -> GitHubPackagesUsername/Password); CI
+// sets these via ORG_GRADLE_PROJECT_GitHubPackagesUsername/Password (see
+// .github/workflows/build-android.yml). Unlike Maven Central, GitHub Packages
+// requires auth to read too, not just publish — consumers need their own PAT.
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/Doko-Demo-Doa/podofo")
+            credentials(PasswordCredentials::class)
+        }
+    }
+}
+
 mavenPublishing {
     pom {
         name.set(project.name)
