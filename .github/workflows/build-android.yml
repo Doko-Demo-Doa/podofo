@@ -3,6 +3,12 @@ name: build-android
 on:
   push:
     branches: [ master ]
+    # Path filters are not evaluated for tag pushes (GitHub Actions always runs
+    # the workflow for a matching tag regardless of `paths`), so adding `tags`
+    # here doesn't need its own trigger block: a `vX.Y.Z` tag always triggers a
+    # release build + publish, an ordinary commit to master only runs when it
+    # touches these paths.
+    tags: [ 'v*.*.*' ]
     paths:
       - 'src/podofo/**'
       - 'src/wrapper/**'
@@ -18,6 +24,14 @@ on:
       - 'scripts/android/**'
       - '.github/workflows/build-android.yml'
   workflow_dispatch:
+    inputs:
+      publish_version:
+        description: 'Version to (re-)publish to GitHub Packages, eg. 1.2.3 (leave empty for a normal, non-publishing build)'
+        required: false
+
+permissions:
+  contents: write  # only needed to create the GitHub Release for a tag push
+  packages: write  # only needed to publish to GitHub Packages
 
 env:
   # nttld/setup-ndk downloads from dl.google.com using Google's "rXXy" release
@@ -25,6 +39,12 @@ env:
   # `sdkmanager`/`source.properties` for the same release.
   # https://github.com/android/ndk/releases#release-r27d
   NDK_VERSION: r27c
+  # Hoisted to workflow-level env (rather than read from `secrets` directly in
+  # the step's `if:` below) because the `secrets` context isn't accessible in
+  # `if:` conditionals at all — GitHub Actions masks/restricts it there for
+  # log-safety reasons. A step's own `env:` block isn't visible to that same
+  # step's `if:` either, so this has to live at the job/workflow level.
+  MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
 
 jobs:
   build-android-aar:
@@ -32,6 +52,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      # A `vX.Y.Z` tag push is the only source of a release version — nothing
+      # is ever committed to gradle.properties. A workflow_dispatch run with
+      # publish_version set re-publishes that exact version without needing a
+      # new tag (eg. retrying after a Maven Central/Packages outage).
+      - name: Determine release version
+        id: release
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ inputs.publish_version }}" ]; then
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=${{ inputs.publish_version }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -120,7 +158,12 @@ jobs:
 
       - name: Build AAR
         working-directory: src/android
-        run: ./gradlew build
+        run: |
+          if [ "${{ steps.release.outputs.is_release }}" = "true" ]; then
+            ./gradlew build -Pversion="${{ steps.release.outputs.version }}"
+          else
+            ./gradlew build
+          fi
 
       - name: Verify AAR contents
         run: |
@@ -134,3 +177,65 @@ jobs:
         with:
           name: podofo-android-aar
           path: src/android/build/outputs/aar/*.aar
+
+      - name: Publish to GitHub Packages
+        if: steps.release.outputs.is_release == 'true'
+        working-directory: src/android
+        env:
+          ORG_GRADLE_PROJECT_GitHubPackagesUsername: ${{ github.actor }}
+          ORG_GRADLE_PROJECT_GitHubPackagesPassword: ${{ secrets.GITHUB_TOKEN }}
+        # RELEASE_SIGNING_ENABLED=true in gradle.properties is meant for the
+        # Maven Central path (mavenPublishing {}): Gradle's signing plugin ties
+        # signing to the publication, not the destination repository, so
+        # without this override `signMavenPublication` fails here for lack of a
+        # configured GPG key — GitHub Packages doesn't require signed artifacts.
+        run: |
+          ./gradlew publishAllPublicationsToGitHubPackagesRepository \
+              -Pversion="${{ steps.release.outputs.version }}" \
+              -PRELEASE_SIGNING_ENABLED=false
+
+      # Skips cleanly (rather than failing the whole release) until the Maven
+      # Central secrets below are actually configured in this repo — see
+      # README_extended.md for how to obtain each one (Central Portal user
+      # token + a GPG key). Unlike GitHub Packages, Central requires signed
+      # artifacts, which is exactly what RELEASE_SIGNING_ENABLED=true in
+      # gradle.properties already expects — no override needed here.
+      - name: Publish to Maven Central
+        if: steps.release.outputs.is_release == 'true' && env.MAVEN_CENTRAL_USERNAME != ''
+        working-directory: src/android
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.GPG_SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
+        # publishToMavenCentral stages the release; matches
+        # SONATYPE_AUTOMATIC_RELEASE=false in gradle.properties, meaning a
+        # manual "Publish" click in Central Portal is still needed afterward.
+        # Switch to publishAndReleaseToMavenCentral (and flip that property to
+        # true) once you trust the pipeline enough to skip manual review.
+        run: ./gradlew publishToMavenCentral -Pversion="${{ steps.release.outputs.version }}"
+
+      # Only for an actual tag push, not a workflow_dispatch re-publish of an
+      # already-released version — otherwise re-running the dispatch input
+      # would try (and fail) to create a duplicate release for the same tag.
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # AGP's default output names (*-release.aar/*-debug.aar) have no
+          # version in them at all. Renamed copies here follow Maven/ivy-style
+          # <module>-<version>[-<classifier>].aar naming so consumers can
+          # resolve these directly as a Gradle dependency via an ivy-pattern
+          # repository pointed at GitHub Releases (see README_extended.md),
+          # instead of only being a manual-download link.
+          VERSION="${{ steps.release.outputs.version }}"
+          MODULE="leiacare-lib-android-podofo"  # must match rootProject.name in src/android/settings.gradle.kts
+          mkdir -p release-assets
+          cp "src/android/build/outputs/aar/${MODULE}-release.aar" "release-assets/${MODULE}-${VERSION}.aar"
+          cp "src/android/build/outputs/aar/${MODULE}-debug.aar" "release-assets/${MODULE}-${VERSION}-debug.aar"
+          gh release create "${{ github.ref_name }}" \
+              --title "${{ github.ref_name }}" \
+              --generate-notes \
+              release-assets/*.aar
