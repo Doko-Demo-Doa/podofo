@@ -122,9 +122,15 @@ function build() {
         # Copy source files
         cp -r "$BUILD_DIR/zlib-$ZLIB_VERSION"/* .
         
-        # Configure zlib for cross-compilation
+        # Configure zlib for cross-compilation. AR/RANLIB must be passed
+        # explicitly — zlib's configure defaults them to the host's plain
+        # "ar"/"ranlib" otherwise, which archives the NDK-compiled ELF
+        # objects into a member-less libz.a (no error, just an empty
+        # archive), leaving deflate/inflate unresolved at APK runtime.
         CHOST="$HOST" \
         CC="$CC" \
+        AR="$AR" \
+        RANLIB="$RANLIB" \
         CFLAGS="-fPIC -O3" \
         ./configure --static --prefix="$INSTALL_DIR/$ABI"
         
