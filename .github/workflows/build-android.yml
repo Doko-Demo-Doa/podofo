@@ -39,6 +39,12 @@ env:
   # `sdkmanager`/`source.properties` for the same release.
   # https://github.com/android/ndk/releases#release-r27d
   NDK_VERSION: r27c
+  # Hoisted to workflow-level env (rather than read from `secrets` directly in
+  # the step's `if:` below) because the `secrets` context isn't accessible in
+  # `if:` conditionals at all — GitHub Actions masks/restricts it there for
+  # log-safety reasons. A step's own `env:` block isn't visible to that same
+  # step's `if:` either, so this has to live at the job/workflow level.
+  MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
 
 jobs:
   build-android-aar:
@@ -187,6 +193,28 @@ jobs:
           ./gradlew publishAllPublicationsToGitHubPackagesRepository \
               -Pversion="${{ steps.release.outputs.version }}" \
               -PRELEASE_SIGNING_ENABLED=false
+
+      # Skips cleanly (rather than failing the whole release) until the Maven
+      # Central secrets below are actually configured in this repo — see
+      # README_extended.md for how to obtain each one (Central Portal user
+      # token + a GPG key). Unlike GitHub Packages, Central requires signed
+      # artifacts, which is exactly what RELEASE_SIGNING_ENABLED=true in
+      # gradle.properties already expects — no override needed here.
+      - name: Publish to Maven Central
+        if: steps.release.outputs.is_release == 'true' && env.MAVEN_CENTRAL_USERNAME != ''
+        working-directory: src/android
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.GPG_SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
+        # publishToMavenCentral stages the release; matches
+        # SONATYPE_AUTOMATIC_RELEASE=false in gradle.properties, meaning a
+        # manual "Publish" click in Central Portal is still needed afterward.
+        # Switch to publishAndReleaseToMavenCentral (and flip that property to
+        # true) once you trust the pipeline enough to skip manual review.
+        run: ./gradlew publishToMavenCentral -Pversion="${{ steps.release.outputs.version }}"
 
       # Only for an actual tag push, not a workflow_dispatch re-publish of an
       # already-released version — otherwise re-running the dispatch input
