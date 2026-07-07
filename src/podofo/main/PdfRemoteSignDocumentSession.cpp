@@ -346,12 +346,12 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::getCrlFromCertificate(const st
 
     const unsigned char* p = decoded.data();
     std::unique_ptr<X509, decltype(&X509_free)> cert(
-        d2i_X509(nullptr, &p, decoded.size()), X509_free);
+        d2i_X509(nullptr, &p, static_cast<long>(decoded.size())), X509_free);
 
     if (!cert) {
         p = decoded.data();
         std::unique_ptr<TS_RESP, decltype(&TS_RESP_free)> ts_resp(
-            d2i_TS_RESP(nullptr, &p, decoded.size()), TS_RESP_free);
+            d2i_TS_RESP(nullptr, &p, static_cast<long>(decoded.size())), TS_RESP_free);
         if (!ts_resp) {
             throw std::runtime_error("Failed to parse DER as X.509 certificate or TimeStampResp.");
         }
@@ -712,7 +712,7 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::ExtractTimestampTokenFromTSR(c
 std::string PoDoFo::PdfRemoteSignDocumentSession::extractSignerCertFromTSR(const std::string& base64Tsr) {
     std::vector<unsigned char> tsr_der = ConvertBase64PEMtoDER(std::optional<std::string>(base64Tsr), std::nullopt);
     const unsigned char* p = tsr_der.data();
-    std::unique_ptr<TS_RESP, decltype(&TS_RESP_free)> ts_resp(d2i_TS_RESP(nullptr, &p, tsr_der.size()), TS_RESP_free);
+    std::unique_ptr<TS_RESP, decltype(&TS_RESP_free)> ts_resp(d2i_TS_RESP(nullptr, &p, static_cast<long>(tsr_der.size())), TS_RESP_free);
     if (!ts_resp) throw std::runtime_error("Failed to parse TS_RESP from DER.");
 
     PKCS7* pkcs7 = TS_RESP_get_token(ts_resp.get());
@@ -740,7 +740,7 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::extractSignerCertFromTSR(const
 std::string PoDoFo::PdfRemoteSignDocumentSession::extractIssuerCertFromTSR(const std::string& base64Tsr) {
     std::vector<unsigned char> tsr_der = ConvertBase64PEMtoDER(std::optional<std::string>(base64Tsr), std::nullopt);
     const unsigned char* p = tsr_der.data();
-    std::unique_ptr<TS_RESP, decltype(&TS_RESP_free)> ts_resp(d2i_TS_RESP(nullptr, &p, tsr_der.size()), TS_RESP_free);
+    std::unique_ptr<TS_RESP, decltype(&TS_RESP_free)> ts_resp(d2i_TS_RESP(nullptr, &p, static_cast<long>(tsr_der.size())), TS_RESP_free);
     if (!ts_resp) throw std::runtime_error("Failed to parse TS_RESP from DER.");
 
     PKCS7* pkcs7 = TS_RESP_get_token(ts_resp.get());
@@ -770,11 +770,11 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::getOCSPFromCertificate(const s
     std::vector<unsigned char> decoded_issuer = ConvertBase64PEMtoDER(std::optional<std::string>(base64IssuerCert), std::nullopt);
 
     const unsigned char* p = decoded_cert.data();
-    std::unique_ptr<X509, decltype(&X509_free)> cert(d2i_X509(nullptr, &p, decoded_cert.size()), X509_free);
+    std::unique_ptr<X509, decltype(&X509_free)> cert(d2i_X509(nullptr, &p, static_cast<long>(decoded_cert.size())), X509_free);
     if (!cert) throw std::runtime_error("Failed to parse DER certificate: " + std::string(ERR_reason_error_string(ERR_get_error())));
 
     const unsigned char* pi = decoded_issuer.data();
-    std::unique_ptr<X509, decltype(&X509_free)> issuer(d2i_X509(nullptr, &pi, decoded_issuer.size()), X509_free);
+    std::unique_ptr<X509, decltype(&X509_free)> issuer(d2i_X509(nullptr, &pi, static_cast<long>(decoded_issuer.size())), X509_free);
     if (!issuer) throw std::runtime_error("Failed to parse DER issuer certificate: " + std::string(ERR_reason_error_string(ERR_get_error())));
 
     std::string ocsp_url;
@@ -802,11 +802,11 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::buildOCSPRequestFromCertificat
     std::vector<unsigned char> decoded_issuer = ConvertBase64PEMtoDER(std::optional<std::string>(base64IssuerCert), std::nullopt);
 
     const unsigned char* p = decoded_cert.data();
-    std::unique_ptr<X509, decltype(&X509_free)> cert(d2i_X509(nullptr, &p, decoded_cert.size()), X509_free);
+    std::unique_ptr<X509, decltype(&X509_free)> cert(d2i_X509(nullptr, &p, static_cast<long>(decoded_cert.size())), X509_free);
     if (!cert) throw std::runtime_error("Failed to parse DER certificate: " + std::string(ERR_reason_error_string(ERR_get_error())));
 
     const unsigned char* pi = decoded_issuer.data();
-    std::unique_ptr<X509, decltype(&X509_free)> issuer(d2i_X509(nullptr, &pi, decoded_issuer.size()), X509_free);
+    std::unique_ptr<X509, decltype(&X509_free)> issuer(d2i_X509(nullptr, &pi, static_cast<long>(decoded_issuer.size())), X509_free);
     if (!issuer) throw std::runtime_error("Failed to parse DER issuer certificate: " + std::string(ERR_reason_error_string(ERR_get_error())));
 
     std::unique_ptr<OCSP_REQUEST, decltype(&OCSP_REQUEST_free)> req(OCSP_REQUEST_new(), OCSP_REQUEST_free);
@@ -834,7 +834,7 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::getCertificateIssuerUrlFromCer
     std::vector<unsigned char> decoded_cert = ConvertBase64PEMtoDER(std::optional<std::string>(base64Cert), std::nullopt);
 
     const unsigned char* p = decoded_cert.data();
-    std::unique_ptr<X509, decltype(&X509_free)> cert(d2i_X509(nullptr, &p, decoded_cert.size()), X509_free);
+    std::unique_ptr<X509, decltype(&X509_free)> cert(d2i_X509(nullptr, &p, static_cast<long>(decoded_cert.size())), X509_free);
     if (!cert) throw std::runtime_error("Failed to parse DER certificate: " + std::string(ERR_reason_error_string(ERR_get_error())));
 
     std::string ca_issuer_url;
