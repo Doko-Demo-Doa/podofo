@@ -235,6 +235,113 @@ nullable<PdfDate> PdfSignature::GetSignatureDate() const
     return date;
 }
 
+bool PdfSignature::HasSignatureValue() const
+{
+    if (m_ValueObj == nullptr)
+        return false;
+
+    return m_ValueObj->GetDictionary().FindKey("Contents") != nullptr;
+}
+
+nullable<const PdfName&> PdfSignature::GetFilter() const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    return getNameFromValueDict("Filter");
+}
+
+nullable<const PdfName&> PdfSignature::GetSubFilter() const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    return getNameFromValueDict("SubFilter");
+}
+
+nullable<const PdfName&> PdfSignature::GetType() const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    return getNameFromValueDict("Type");
+}
+
+nullable<const PdfString&> PdfSignature::GetContactInfo() const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    return getStringFromValueDict("ContactInfo");
+}
+
+nullable<const PdfArray&> PdfSignature::GetByteRange() const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    const PdfArray* arr;
+    auto obj = m_ValueObj->GetDictionary().FindKey("ByteRange");
+    if (obj == nullptr || !obj->TryGetArray(arr))
+        return nullptr;
+
+    return *arr;
+}
+
+nullable<const PdfDictionary&> PdfSignature::GetPropBuild() const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    const PdfDictionary* dict;
+    auto obj = m_ValueObj->GetDictionary().FindKey("Prop_Build");
+    if (obj == nullptr || !obj->TryGetDictionary(dict))
+        return nullptr;
+
+    return *dict;
+}
+
+bool PdfSignature::TryGetContents(charbuff& contents) const
+{
+    if (m_ValueObj == nullptr)
+        return false;
+
+    auto obj = m_ValueObj->GetDictionary().FindKey("Contents");
+    if (obj == nullptr)
+        return false;
+
+    // Existing signed PDFs store /Contents as a hex string.
+    // If the string has already been evaluated as text, the raw bytes are no
+    // longer directly accessible.
+    const PdfString* str;
+    if (!obj->TryGetString(str) || !str->IsHex() || str->IsStringEvaluated())
+        return false;
+
+    auto rawData = str->GetRawData();
+    contents.assign(rawData.data(), rawData.size());
+    return true;
+}
+
+nullable<const PdfName&> PdfSignature::getNameFromValueDict(const string_view& key) const
+{
+    const PdfName* name;
+    auto obj = m_ValueObj->GetDictionary().FindKey(key);
+    if (obj == nullptr || !obj->TryGetName(name))
+        return nullptr;
+
+    return *name;
+}
+
+nullable<const PdfString&> PdfSignature::getStringFromValueDict(const string_view& key) const
+{
+    const PdfString* str;
+    auto obj = m_ValueObj->GetDictionary().FindKey(key);
+    if (obj == nullptr || !obj->TryGetString(str))
+        return nullptr;
+
+    return *str;
+}
+
 bool PdfSignature::TryGetPreviousRevision(InputStreamDevice& input, OutputStreamDevice& output) const
 {
     const PdfArray* byteRange = nullptr;
