@@ -277,6 +277,46 @@ extern "C"
     JNIEXPORT void JNICALL Java_com_podofo_android_PdfField_nativeSetChecked(
         JNIEnv *env, jobject thiz, jlong handle, jboolean checked);
 
+    // PdfSignature (PoDoFo::PdfSignature) — non-owning, like PdfField.
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfSignature_nativeHasSignatureValue(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetFilter(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetSubFilter(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetType(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetName(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetReason(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetLocation(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetContactInfo(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetSignDate(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jlongArray JNICALL Java_com_podofo_android_PdfSignature_nativeGetByteRange(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetPropBuild(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jbyteArray JNICALL Java_com_podofo_android_PdfSignature_nativeGetContents(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jobject JNICALL Java_com_podofo_android_PdfSignature_nativeParseContents(
+        JNIEnv *env, jobject thiz, jlong handle);
+
     // PdfAnnotation (PoDoFo::PdfAnnotation) — non-owning, like PdfField:
     // owned by its page's annotation collection.
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfAnnotation_nativeGetAnnotationType(

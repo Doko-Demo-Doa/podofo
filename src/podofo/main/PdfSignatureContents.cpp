@@ -15,6 +15,10 @@
 
 #include <time.h>
 
+#if _WIN32
+#define timegm _mkgmtime
+#endif
+
 using namespace std;
 using namespace PoDoFo;
 

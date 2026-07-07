@@ -63,6 +63,17 @@ public class PdfField {
     nativeSetChecked(nativeHandle, checked);
   }
 
+  /**
+   * @return this field as a {@link PdfSignature}
+   * @throws PoDoFoException if this field isn't a Signature field
+   */
+  public PdfSignature asSignature() throws PoDoFoException {
+    if (!"Signature".equals(getFieldType())) {
+      throw new PoDoFoException("Field is not a Signature field");
+    }
+    return new PdfSignature(nativeHandle);
+  }
+
   private native String nativeGetFieldType(long handle);
 
   private native String nativeGetFullName(long handle);

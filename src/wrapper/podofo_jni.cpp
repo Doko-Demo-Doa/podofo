@@ -1311,6 +1311,254 @@ extern "C" {
         toggle->SetChecked(checked == JNI_TRUE);
     }
 
+    // ---- PdfSignature ----
+
+    static jobject createPdfSignatureContents(JNIEnv* env, const PoDoFo::PdfSignatureContents& contents)
+    {
+        jclass contentsClass = env->FindClass("com/podofo/android/PdfSignatureContents");
+        if (contentsClass == nullptr)
+            return nullptr;
+
+        jclass signerInfoClass = env->FindClass("com/podofo/android/PdfSignatureContents$SignerInfo");
+        if (signerInfoClass == nullptr)
+            return nullptr;
+
+        jclass timestampInfoClass = env->FindClass("com/podofo/android/PdfSignatureContents$TimestampInfo");
+        if (timestampInfoClass == nullptr)
+            return nullptr;
+
+        jclass arrayListClass = env->FindClass("java/util/ArrayList");
+        if (arrayListClass == nullptr)
+            return nullptr;
+
+        jmethodID contentsCtor = env->GetMethodID(contentsClass, "<init>",
+            "(Ljava/util/List;Lcom/podofo/android/PdfSignatureContents$TimestampInfo;)V");
+        jmethodID signerInfoCtor = env->GetMethodID(signerInfoClass, "<init>",
+            "([BLjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
+        jmethodID timestampInfoCtor = env->GetMethodID(timestampInfoClass, "<init>",
+            "(Ljava/lang/String;[BLjava/lang/String;)V");
+        jmethodID arrayListCtor = env->GetMethodID(arrayListClass, "<init>", "(I)V");
+        jmethodID arrayListAdd = env->GetMethodID(arrayListClass, "add", "(Ljava/lang/Object;)Z");
+
+        if (contentsCtor == nullptr || signerInfoCtor == nullptr || timestampInfoCtor == nullptr ||
+            arrayListCtor == nullptr || arrayListAdd == nullptr)
+        {
+            return nullptr;
+        }
+
+        const auto& signerInfos = contents.GetSignerInfos();
+        jobject list = env->NewObject(arrayListClass, arrayListCtor, (jint)signerInfos.size());
+
+        for (const auto& signer : signerInfos)
+        {
+            jbyteArray certBytes = nullptr;
+            if (!signer.Certificate.empty())
+            {
+                certBytes = env->NewByteArray((jsize)signer.Certificate.size());
+                env->SetByteArrayRegion(certBytes, 0, (jsize)signer.Certificate.size(),
+                    reinterpret_cast<const jbyte*>(signer.Certificate.data()));
+            }
+
+            jstring subject = signer.Subject.empty() ? nullptr : stringToJstring(env, signer.Subject);
+            jstring issuer = signer.Issuer.empty() ? nullptr : stringToJstring(env, signer.Issuer);
+            jstring serial = signer.Serial.empty() ? nullptr : stringToJstring(env, signer.Serial);
+            jstring signingTime = signer.SigningTime.has_value()
+                ? stringToJstring(env, std::string(signer.SigningTime->ToStringW3C().GetString()))
+                : nullptr;
+
+            jobject signerInfo = env->NewObject(signerInfoClass, signerInfoCtor,
+                certBytes, subject, issuer, serial, signingTime);
+            env->CallBooleanMethod(list, arrayListAdd, signerInfo);
+
+            env->DeleteLocalRef(signingTime);
+            env->DeleteLocalRef(serial);
+            env->DeleteLocalRef(issuer);
+            env->DeleteLocalRef(subject);
+            env->DeleteLocalRef(certBytes);
+            env->DeleteLocalRef(signerInfo);
+        }
+
+        jobject timestampInfo = nullptr;
+        PoDoFo::PdfSignatureTimestampInfo ts;
+        if (contents.TryGetTimestampToken(ts))
+        {
+            jstring genTime = stringToJstring(env, std::string(ts.GenTime.ToStringW3C().GetString()));
+            jbyteArray tsaCertBytes = nullptr;
+            if (ts.TsaCertificate.has_value() && !ts.TsaCertificate->empty())
+            {
+                tsaCertBytes = env->NewByteArray((jsize)ts.TsaCertificate->size());
+                env->SetByteArrayRegion(tsaCertBytes, 0, (jsize)ts.TsaCertificate->size(),
+                    reinterpret_cast<const jbyte*>(ts.TsaCertificate->data()));
+            }
+            jstring tsaSubject = ts.TsaSubject.empty() ? nullptr : stringToJstring(env, ts.TsaSubject);
+
+            timestampInfo = env->NewObject(timestampInfoClass, timestampInfoCtor,
+                genTime, tsaCertBytes, tsaSubject);
+
+            env->DeleteLocalRef(tsaSubject);
+            env->DeleteLocalRef(tsaCertBytes);
+            env->DeleteLocalRef(genTime);
+        }
+
+        jobject result = env->NewObject(contentsClass, contentsCtor, list, timestampInfo);
+
+        env->DeleteLocalRef(timestampInfo);
+        env->DeleteLocalRef(list);
+
+        return result;
+    }
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfSignature_nativeHasSignatureValue(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        return signature->HasSignatureValue() ? JNI_TRUE : JNI_FALSE;
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetFilter(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetFilter();
+        return value.has_value() ? stringToJstring(env, std::string(value->GetString())) : nullptr;
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetSubFilter(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetSubFilter();
+        return value.has_value() ? stringToJstring(env, std::string(value->GetString())) : nullptr;
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetType(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetType();
+        return value.has_value() ? stringToJstring(env, std::string(value->GetString())) : nullptr;
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetName(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetSignerName();
+        return value.has_value() ? stringToJstring(env, std::string(value->GetString())) : nullptr;
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetReason(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetSignatureReason();
+        return value.has_value() ? stringToJstring(env, std::string(value->GetString())) : nullptr;
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetLocation(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetSignatureLocation();
+        return value.has_value() ? stringToJstring(env, std::string(value->GetString())) : nullptr;
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetContactInfo(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetContactInfo();
+        return value.has_value() ? stringToJstring(env, std::string(value->GetString())) : nullptr;
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetSignDate(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetSignatureDate();
+        return value.has_value()
+            ? stringToJstring(env, std::string(value->ToStringW3C().GetString()))
+            : nullptr;
+    }
+
+    JNIEXPORT jlongArray JNICALL Java_com_podofo_android_PdfSignature_nativeGetByteRange(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetByteRange();
+        if (!value.has_value())
+            return nullptr;
+
+        jsize size = (jsize)value->GetSize();
+        jlongArray result = env->NewLongArray(size);
+        std::vector<jlong> temp(size);
+        for (jsize i = 0; i < size; i++)
+        {
+            int64_t num;
+            if (value->TryGetAtAs(i, num))
+                temp[i] = (jlong)num;
+            else
+                temp[i] = 0;
+        }
+        env->SetLongArrayRegion(result, 0, size, temp.data());
+        return result;
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfSignature_nativeGetPropBuild(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        auto value = signature->GetPropBuild();
+        if (!value.has_value())
+            return nullptr;
+
+        try {
+            PoDoFo::PdfVariant variant(*value);
+            std::string str;
+            variant.ToString(str, PoDoFo::PdfWriteFlags::None);
+            return stringToJstring(env, str);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return nullptr;
+        }
+    }
+
+    JNIEXPORT jbyteArray JNICALL Java_com_podofo_android_PdfSignature_nativeGetContents(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        PoDoFo::charbuff contents;
+        if (!signature->TryGetContents(contents))
+            return nullptr;
+
+        jbyteArray result = env->NewByteArray((jsize)contents.size());
+        env->SetByteArrayRegion(result, 0, (jsize)contents.size(),
+            reinterpret_cast<const jbyte*>(contents.data()));
+        return result;
+    }
+
+    JNIEXPORT jobject JNICALL Java_com_podofo_android_PdfSignature_nativeParseContents(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+        PoDoFo::charbuff contents;
+        if (!signature->TryGetContents(contents))
+            return nullptr;
+
+        try {
+            PoDoFo::PdfSignatureContents parsed(contents);
+            if (!parsed.IsValid())
+            {
+                throwJavaException(env, "Failed to parse signature contents");
+                return nullptr;
+            }
+            return createPdfSignatureContents(env, parsed);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return nullptr;
+        }
+    }
+
     // ---- PdfAnnotation ----
 
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfAnnotation_nativeGetAnnotationType(
