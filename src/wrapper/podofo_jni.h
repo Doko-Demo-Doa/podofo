@@ -170,6 +170,22 @@ extern "C"
     JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetOrCreateOutlines(
         JNIEnv *env, jobject thiz, jlong handle);
 
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetOrCreateFont(
+        JNIEnv *env, jobject thiz, jlong handle, jstring jFontFilePath);
+
+    // Returns an owning handle (see PdfImage.java) — PdfDocument::CreateImage()
+    // returns a unique_ptr the caller must keep alive, unlike PdfPage/PdfField/
+    // PdfAnnotation which are owned by an existing document-internal collection.
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreateImageFromBuffer(
+        JNIEnv *env, jobject thiz, jlong handle, jbyteArray jData);
+
+    // AES-256/R6 (PoDoFo's own default) only for now — see PdfDocument.java.
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetEncrypted(
+        JNIEnv *env, jobject thiz, jlong handle, jstring jUserPassword, jstring jOwnerPassword, jint permissions);
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsEncrypted(
+        JNIEnv *env, jobject thiz, jlong handle);
+
     // PdfPage (PoDoFo::PdfPage) — non-owning: the page is owned by its parent
     // document's page tree, so there is deliberately no nativeClose/delete here.
     JNIEXPORT jdouble JNICALL Java_com_podofo_android_PdfPage_nativeGetWidth(
@@ -213,6 +229,9 @@ extern "C"
 
     JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeDrawText(
         JNIEnv *env, jobject thiz, jlong handle, jstring jText, jdouble x, jdouble y);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeDrawImage(
+        JNIEnv *env, jobject thiz, jlong handle, jlong imageHandle, jdouble x, jdouble y, jdouble scaleX, jdouble scaleY);
 
     JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeDrawLine(
         JNIEnv *env, jobject thiz, jlong handle, jdouble x1, jdouble y1, jdouble x2, jdouble y2);
@@ -300,6 +319,16 @@ extern "C"
 
     JNIEXPORT void JNICALL Java_com_podofo_android_PdfOutlineItem_nativeSetDestinationToPage(
         JNIEnv *env, jobject thiz, jlong handle, jlong pageHandle);
+
+    // PdfImage (PoDoFo::PdfImage) — owning, like PdfPainter: see PdfImage.java.
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfImage_nativeGetWidth(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfImage_nativeGetHeight(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfImage_nativeDestroy(
+        JNIEnv *env, jobject thiz, jlong handle);
 }
 
 #endif // PODOFO_JNI_H

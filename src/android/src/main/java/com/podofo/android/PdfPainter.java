@@ -85,6 +85,20 @@ public class PdfPainter implements AutoCloseable {
     nativeDrawText(nativeHandle, text, x, y);
   }
 
+  /** Draws an image at its natural size. */
+  public void drawImage(PdfImage image, double x, double y) {
+    drawImage(image, x, y, 1.0, 1.0);
+  }
+
+  /** Draws an image, scaled by the given factors. */
+  public void drawImage(PdfImage image, double x, double y, double scaleX, double scaleY) {
+    checkOpen();
+    if (image == null) {
+      throw new IllegalArgumentException("image must not be null");
+    }
+    nativeDrawImage(nativeHandle, image.nativeHandle, x, y, scaleX, scaleY);
+  }
+
   /** Strokes a line with the current stroking color and line settings. */
   public void drawLine(double x1, double y1, double x2, double y2) {
     checkOpen();
@@ -171,6 +185,8 @@ public class PdfPainter implements AutoCloseable {
   private native void nativeSetFont(long handle, long fontHandle, double fontSize);
 
   private native void nativeDrawText(long handle, String text, double x, double y);
+
+  private native void nativeDrawImage(long handle, long imageHandle, double x, double y, double scaleX, double scaleY);
 
   private native void nativeDrawLine(long handle, double x1, double y1, double x2, double y2);
 

@@ -159,6 +159,91 @@ public class PdfDocument implements AutoCloseable {
   }
 
   /**
+   * Loads a font from a font file (TTF/OTF) for use with
+   * {@link PdfPainter#setFont(PdfFont, double)}. This is the counterpart to
+   * {@link #getStandard14Font(String)} for apps that want a specific
+   * embedded font rather than one of the 14 built-ins — there is no
+   * by-name system-font search available (needs Fontconfig, unavailable on
+   * Android; see SUMMARIZE.md).
+   *
+   * @param fontFilePath path to a font file readable from native code (eg.
+   *                     a file copied out of the app's assets — a raw
+   *                     assets/ path is not directly usable here)
+   * @throws PoDoFoException if the font couldn't be loaded
+   */
+  public PdfFont getOrCreateFont(String fontFilePath) throws PoDoFoException {
+    checkOpen();
+    if (fontFilePath == null) {
+      throw new IllegalArgumentException("fontFilePath must not be null");
+    }
+    long fontHandle = nativeGetOrCreateFont(nativeHandle, fontFilePath);
+    if (fontHandle == 0) {
+      throw new PoDoFoException("Failed to load font: " + fontFilePath);
+    }
+    return new PdfFont(fontHandle);
+  }
+
+  /**
+   * Decodes an encoded image (JPEG/PNG/etc.) from a buffer and embeds it
+   * in the document, ready to draw via
+   * {@link PdfPainter#drawImage(PdfImage, double, double)}.
+   *
+   * @throws PoDoFoException if the image couldn't be decoded/embedded
+   */
+  public PdfImage createImageFromBuffer(byte[] data) throws PoDoFoException {
+    checkOpen();
+    if (data == null) {
+      throw new IllegalArgumentException("data must not be null");
+    }
+    long imageHandle = nativeCreateImageFromBuffer(nativeHandle, data);
+    if (imageHandle == 0) {
+      throw new PoDoFoException("Failed to create image from buffer");
+    }
+    return new PdfImage(imageHandle);
+  }
+
+  /**
+   * Encrypts the document (AES-256, PDF 2.0 revision 6 — PoDoFo's own
+   * default algorithm) with {@link PdfPermission#DEFAULT} permissions.
+   * Takes effect on the next {@link #save(String)}.
+   *
+   * @param userPassword  required to open the document at all; pass ""
+   *                      for no open password
+   * @param ownerPassword required to change permissions/remove protection
+   */
+  public void setEncrypted(String userPassword, String ownerPassword) {
+    setEncrypted(userPassword, ownerPassword, PdfPermission.DEFAULT);
+  }
+
+  /**
+   * Encrypts the document (AES-256, PDF 2.0 revision 6 — PoDoFo's own
+   * default algorithm) with the given permissions. Takes effect on the
+   * next {@link #save(String)}. There is currently no binding for
+   * choosing a different algorithm/key length or legacy RC4 encryption.
+   *
+   * @param userPassword  required to open the document at all; pass ""
+   *                      for no open password
+   * @param ownerPassword required to change permissions/remove protection
+   * @param permissions   {@link PdfPermission} flags OR'd together
+   */
+  public void setEncrypted(String userPassword, String ownerPassword, int permissions) {
+    checkOpen();
+    if (userPassword == null || ownerPassword == null) {
+      throw new IllegalArgumentException("userPassword/ownerPassword must not be null (use \"\" for none)");
+    }
+    nativeSetEncrypted(nativeHandle, userPassword, ownerPassword, permissions);
+  }
+
+  /**
+   * @return true if this document was loaded from (or has been set to
+   *         become, pending save) an encrypted file
+   */
+  public boolean isEncrypted() {
+    checkOpen();
+    return nativeIsEncrypted(nativeHandle);
+  }
+
+  /**
    * @return the number of AcroForm fields in this document (0 if there is
    *         no AcroForm yet)
    */
@@ -310,6 +395,14 @@ public class PdfDocument implements AutoCloseable {
   private native long nativeCreateField(long handle, String name, String fieldType);
 
   private native long nativeGetOrCreateOutlines(long handle);
+
+  private native long nativeGetOrCreateFont(long handle, String fontFilePath);
+
+  private native long nativeCreateImageFromBuffer(long handle, byte[] data);
+
+  private native void nativeSetEncrypted(long handle, String userPassword, String ownerPassword, int permissions);
+
+  private native boolean nativeIsEncrypted(long handle);
 
   private native String nativeGetTitle(long handle);
 

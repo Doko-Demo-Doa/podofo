@@ -882,6 +882,71 @@ extern "C" {
         }
     }
 
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetOrCreateFont(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jFontFilePath) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            std::string fontPath = jstringToString(env, jFontFilePath);
+            auto& font = doc->GetFonts().GetOrCreateFont(fontPath);
+            return reinterpret_cast<jlong>(&font);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreateImageFromBuffer(
+        JNIEnv* env, jobject thiz, jlong handle, jbyteArray jData) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            jsize length = env->GetArrayLength(jData);
+            jbyte* bytes = env->GetByteArrayElements(jData, nullptr);
+            if (bytes == nullptr) {
+                throwJavaException(env, "Failed to access image data");
+                return 0;
+            }
+
+            std::unique_ptr<PoDoFo::PdfImage> image;
+            try {
+                image = doc->CreateImage();
+                PoDoFo::bufferview buffer(reinterpret_cast<const char*>(bytes), static_cast<size_t>(length));
+                image->LoadFromBuffer(buffer);
+            } catch (...) {
+                env->ReleaseByteArrayElements(jData, bytes, JNI_ABORT);
+                throw;
+            }
+            env->ReleaseByteArrayElements(jData, bytes, JNI_ABORT);
+
+            return reinterpret_cast<jlong>(image.release());
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetEncrypted(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jUserPassword, jstring jOwnerPassword, jint permissions) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            std::string userPassword = jstringToString(env, jUserPassword);
+            std::string ownerPassword = jstringToString(env, jOwnerPassword);
+            doc->SetEncrypted(userPassword, ownerPassword,
+                static_cast<PoDoFo::PdfPermissions>(permissions));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsEncrypted(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        return doc->IsEncrypted() ? JNI_TRUE : JNI_FALSE;
+    }
+
     JNIEXPORT jdouble JNICALL Java_com_podofo_android_PdfPage_nativeGetWidth(
         JNIEnv* env, jobject thiz, jlong handle) {
 
@@ -1067,6 +1132,18 @@ extern "C" {
         try {
             auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
             painter->DrawText(jstringToString(env, jText), x, y);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeDrawImage(
+        JNIEnv* env, jobject thiz, jlong handle, jlong imageHandle, jdouble x, jdouble y, jdouble scaleX, jdouble scaleY) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            auto* image = reinterpret_cast<PoDoFo::PdfImage*>(imageHandle);
+            painter->DrawImage(*image, x, y, scaleX, scaleY);
         } catch (const std::exception& e) {
             throwJavaException(env, e.what());
         }
@@ -1390,6 +1467,30 @@ extern "C" {
             item->SetDestination(*dest);
         } catch (const std::exception& e) {
             throwJavaException(env, e.what());
+        }
+    }
+
+    // ---- PdfImage ----
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfImage_nativeGetWidth(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* image = reinterpret_cast<PoDoFo::PdfImage*>(handle);
+        return static_cast<jint>(image->GetWidth());
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfImage_nativeGetHeight(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* image = reinterpret_cast<PoDoFo::PdfImage*>(handle);
+        return static_cast<jint>(image->GetHeight());
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfImage_nativeDestroy(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        if (handle) {
+            delete reinterpret_cast<PoDoFo::PdfImage*>(handle);
         }
     }
 }
