@@ -131,6 +131,102 @@ public class PdfDocument implements AutoCloseable {
     nativeRemovePageAt(nativeHandle, index);
   }
 
+  /**
+   * Gets one of the 14 PDF "standard" fonts (Helvetica, Times, Courier,
+   * Symbol, ZapfDingbats and their bold/italic variants) — always
+   * renderable by any PDF viewer, no font embedding needed. This works
+   * without Fontconfig (unavailable on Android; see SUMMARIZE.md), unlike
+   * PoDoFo's by-name {@code SearchFont()}. There is currently no binding
+   * for loading a custom/bundled font file.
+   *
+   * @param name one of: TimesRoman, TimesItalic, TimesBold, TimesBoldItalic,
+   *             Helvetica, HelveticaOblique, HelveticaBold,
+   *             HelveticaBoldOblique, Courier, CourierOblique, CourierBold,
+   *             CourierBoldOblique, Symbol, ZapfDingbats (matches PoDoFo's
+   *             own PdfStandard14FontType names)
+   * @throws PoDoFoException if name isn't one of the above
+   */
+  public PdfFont getStandard14Font(String name) throws PoDoFoException {
+    checkOpen();
+    if (name == null) {
+      throw new IllegalArgumentException("name must not be null");
+    }
+    long fontHandle = nativeGetStandard14Font(nativeHandle, name);
+    if (fontHandle == 0) {
+      throw new PoDoFoException("Unknown standard font: " + name);
+    }
+    return new PdfFont(fontHandle);
+  }
+
+  /**
+   * @return the number of AcroForm fields in this document (0 if there is
+   *         no AcroForm yet)
+   */
+  public int getFieldCount() {
+    checkOpen();
+    return nativeGetFieldCount(nativeHandle);
+  }
+
+  /**
+   * Returns the AcroForm field at the given 0-based index. Owned by the
+   * document's AcroForm, same lifetime hazard as {@link #getPage(int)}.
+   *
+   * @throws PoDoFoException if index is out of range
+   */
+  public PdfField getFieldAt(int index) throws PoDoFoException {
+    checkOpen();
+    long fieldHandle = nativeGetFieldAt(nativeHandle, index);
+    if (fieldHandle == 0) {
+      throw new PoDoFoException("Failed to get field at index " + index);
+    }
+    return new PdfField(fieldHandle);
+  }
+
+  /**
+   * Creates a new text box field, creating the document's AcroForm first
+   * if it doesn't exist yet.
+   *
+   * @throws PoDoFoException if the field couldn't be created
+   */
+  public PdfField createTextBox(String name) throws PoDoFoException {
+    checkOpen();
+    if (name == null) {
+      throw new IllegalArgumentException("name must not be null");
+    }
+    long fieldHandle = nativeCreateField(nativeHandle, name, "TextBox");
+    if (fieldHandle == 0) {
+      throw new PoDoFoException("Failed to create text box field: " + name);
+    }
+    return new PdfField(fieldHandle);
+  }
+
+  /**
+   * Creates a new checkbox field, creating the document's AcroForm first
+   * if it doesn't exist yet.
+   *
+   * @throws PoDoFoException if the field couldn't be created
+   */
+  public PdfField createCheckBox(String name) throws PoDoFoException {
+    checkOpen();
+    if (name == null) {
+      throw new IllegalArgumentException("name must not be null");
+    }
+    long fieldHandle = nativeCreateField(nativeHandle, name, "CheckBox");
+    if (fieldHandle == 0) {
+      throw new PoDoFoException("Failed to create checkbox field: " + name);
+    }
+    return new PdfField(fieldHandle);
+  }
+
+  /**
+   * @return the root of the document's outline (bookmark) tree, creating
+   *         it if it doesn't exist yet
+   */
+  public PdfOutlineItem getOrCreateOutlines() {
+    checkOpen();
+    return new PdfOutlineItem(nativeGetOrCreateOutlines(nativeHandle));
+  }
+
   public String getTitle() {
     checkOpen();
     return nativeGetTitle(nativeHandle);
@@ -204,6 +300,16 @@ public class PdfDocument implements AutoCloseable {
   private native long nativeCreatePage(long handle, double width, double height);
 
   private native void nativeRemovePageAt(long handle, int index);
+
+  private native long nativeGetStandard14Font(long handle, String name);
+
+  private native int nativeGetFieldCount(long handle);
+
+  private native long nativeGetFieldAt(long handle, int index);
+
+  private native long nativeCreateField(long handle, String name, String fieldType);
+
+  private native long nativeGetOrCreateOutlines(long handle);
 
   private native String nativeGetTitle(long handle);
 

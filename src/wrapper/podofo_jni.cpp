@@ -778,6 +778,110 @@ extern "C" {
         }
     }
 
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetStandard14Font(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jName) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            std::string name = jstringToString(env, jName);
+
+            PoDoFo::PdfStandard14FontType fontType;
+            if (name == "TimesRoman") fontType = PoDoFo::PdfStandard14FontType::TimesRoman;
+            else if (name == "TimesItalic") fontType = PoDoFo::PdfStandard14FontType::TimesItalic;
+            else if (name == "TimesBold") fontType = PoDoFo::PdfStandard14FontType::TimesBold;
+            else if (name == "TimesBoldItalic") fontType = PoDoFo::PdfStandard14FontType::TimesBoldItalic;
+            else if (name == "Helvetica") fontType = PoDoFo::PdfStandard14FontType::Helvetica;
+            else if (name == "HelveticaOblique") fontType = PoDoFo::PdfStandard14FontType::HelveticaOblique;
+            else if (name == "HelveticaBold") fontType = PoDoFo::PdfStandard14FontType::HelveticaBold;
+            else if (name == "HelveticaBoldOblique") fontType = PoDoFo::PdfStandard14FontType::HelveticaBoldOblique;
+            else if (name == "Courier") fontType = PoDoFo::PdfStandard14FontType::Courier;
+            else if (name == "CourierOblique") fontType = PoDoFo::PdfStandard14FontType::CourierOblique;
+            else if (name == "CourierBold") fontType = PoDoFo::PdfStandard14FontType::CourierBold;
+            else if (name == "CourierBoldOblique") fontType = PoDoFo::PdfStandard14FontType::CourierBoldOblique;
+            else if (name == "Symbol") fontType = PoDoFo::PdfStandard14FontType::Symbol;
+            else if (name == "ZapfDingbats") fontType = PoDoFo::PdfStandard14FontType::ZapfDingbats;
+            else {
+                throwJavaException(env, ("Unknown standard font: " + name).c_str());
+                return 0;
+            }
+
+            auto& font = doc->GetFonts().GetStandard14Font(fontType);
+            return reinterpret_cast<jlong>(&font);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetFieldCount(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* form = doc->GetAcroForm();
+            return form == nullptr ? 0 : static_cast<jint>(form->GetFieldCount());
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetFieldAt(
+        JNIEnv* env, jobject thiz, jlong handle, jint index) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto& form = doc->GetOrCreateAcroForm();
+            auto& field = form.GetFieldAt(static_cast<unsigned>(index));
+            return reinterpret_cast<jlong>(&field);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreateField(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jName, jstring jFieldType) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            std::string name = jstringToString(env, jName);
+            std::string fieldTypeName = jstringToString(env, jFieldType);
+
+            PoDoFo::PdfFieldType fieldType;
+            if (fieldTypeName == "TextBox") fieldType = PoDoFo::PdfFieldType::TextBox;
+            else if (fieldTypeName == "CheckBox") fieldType = PoDoFo::PdfFieldType::CheckBox;
+            else if (fieldTypeName == "RadioButton") fieldType = PoDoFo::PdfFieldType::RadioButton;
+            else if (fieldTypeName == "PushButton") fieldType = PoDoFo::PdfFieldType::PushButton;
+            else if (fieldTypeName == "ComboBox") fieldType = PoDoFo::PdfFieldType::ComboBox;
+            else if (fieldTypeName == "ListBox") fieldType = PoDoFo::PdfFieldType::ListBox;
+            else {
+                throwJavaException(env, ("Unknown field type: " + fieldTypeName).c_str());
+                return 0;
+            }
+
+            auto& form = doc->GetOrCreateAcroForm();
+            auto& field = form.CreateField(name, fieldType);
+            return reinterpret_cast<jlong>(&field);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetOrCreateOutlines(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto& outlines = doc->GetOrCreateOutlines();
+            return reinterpret_cast<jlong>(&outlines);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
     JNIEXPORT jdouble JNICALL Java_com_podofo_android_PdfPage_nativeGetWidth(
         JNIEnv* env, jobject thiz, jlong handle) {
 
@@ -797,5 +901,495 @@ extern "C" {
 
         auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
         return static_cast<jint>(page->GetIndex());
+    }
+
+    JNIEXPORT jobjectArray JNICALL Java_com_podofo_android_PdfPage_nativeExtractText(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jPattern) {
+
+        try {
+            auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+            std::vector<PoDoFo::PdfTextEntry> entries;
+            if (jPattern == nullptr) {
+                page->ExtractTextTo(entries);
+            } else {
+                page->ExtractTextTo(entries, jstringToString(env, jPattern));
+            }
+
+            jclass entryClass = env->FindClass("com/podofo/android/PdfTextEntry");
+            if (entryClass == nullptr) {
+                throwJavaException(env, "Could not find PdfTextEntry class");
+                return nullptr;
+            }
+            jmethodID ctor = env->GetMethodID(entryClass, "<init>", "(Ljava/lang/String;IDDD)V");
+            if (ctor == nullptr) {
+                throwJavaException(env, "Could not find PdfTextEntry constructor");
+                return nullptr;
+            }
+
+            jobjectArray result = env->NewObjectArray(static_cast<jsize>(entries.size()), entryClass, nullptr);
+            for (size_t i = 0; i < entries.size(); i++) {
+                const auto& entry = entries[i];
+                jstring jText = stringToJstring(env, entry.Text);
+                jobject jEntry = env->NewObject(entryClass, ctor, jText,
+                    static_cast<jint>(entry.Page), static_cast<jdouble>(entry.X),
+                    static_cast<jdouble>(entry.Y), static_cast<jdouble>(entry.Length));
+                env->SetObjectArrayElement(result, static_cast<jsize>(i), jEntry);
+                env->DeleteLocalRef(jEntry);
+                env->DeleteLocalRef(jText);
+            }
+            return result;
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return nullptr;
+        }
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfPage_nativeGetAnnotationCount(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+        return static_cast<jint>(page->GetAnnotations().GetCount());
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfPage_nativeGetAnnotationAt(
+        JNIEnv* env, jobject thiz, jlong handle, jint index) {
+
+        try {
+            auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+            auto& annot = page->GetAnnotations().GetAnnotAt(static_cast<unsigned>(index));
+            return reinterpret_cast<jlong>(&annot);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfPage_nativeCreateAnnotation(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jAnnotationType,
+        jdouble x, jdouble y, jdouble width, jdouble height) {
+
+        try {
+            auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+            std::string typeName = jstringToString(env, jAnnotationType);
+
+            PoDoFo::PdfAnnotationType annotType;
+            if (typeName == "Text") annotType = PoDoFo::PdfAnnotationType::Text;
+            else if (typeName == "Link") annotType = PoDoFo::PdfAnnotationType::Link;
+            else if (typeName == "FreeText") annotType = PoDoFo::PdfAnnotationType::FreeText;
+            else if (typeName == "Line") annotType = PoDoFo::PdfAnnotationType::Line;
+            else if (typeName == "Square") annotType = PoDoFo::PdfAnnotationType::Square;
+            else if (typeName == "Circle") annotType = PoDoFo::PdfAnnotationType::Circle;
+            else if (typeName == "Highlight") annotType = PoDoFo::PdfAnnotationType::Highlight;
+            else if (typeName == "Underline") annotType = PoDoFo::PdfAnnotationType::Underline;
+            else if (typeName == "Squiggly") annotType = PoDoFo::PdfAnnotationType::Squiggly;
+            else if (typeName == "StrikeOut") annotType = PoDoFo::PdfAnnotationType::StrikeOut;
+            else if (typeName == "Stamp") annotType = PoDoFo::PdfAnnotationType::Stamp;
+            else if (typeName == "Ink") annotType = PoDoFo::PdfAnnotationType::Ink;
+            else if (typeName == "Popup") annotType = PoDoFo::PdfAnnotationType::Popup;
+            else {
+                throwJavaException(env, ("Unknown or unsupported annotation type: " + typeName).c_str());
+                return 0;
+            }
+
+            auto& annot = page->GetAnnotations().CreateAnnot(annotType, PoDoFo::Rect(x, y, width, height));
+            return reinterpret_cast<jlong>(&annot);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    // ---- PdfPainter ----
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfPainter_nativeCreate(
+        JNIEnv* env, jclass clazz) {
+
+        try {
+            auto* painter = new PoDoFo::PdfPainter();
+            return reinterpret_cast<jlong>(painter);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeSetCanvas(
+        JNIEnv* env, jobject thiz, jlong handle, jlong pageHandle) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            auto* page = reinterpret_cast<PoDoFo::PdfPage*>(pageHandle);
+            painter->SetCanvas(*page);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeDestroy(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        // ~PdfPainter() is `noexcept(false)`: it can throw if FinishDrawing()
+        // wasn't called first. Swallow rather than let a C++ exception escape
+        // across the JNI boundary during what's meant to be a cleanup call.
+        try {
+            delete reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+        } catch (const std::exception& e) {
+            __android_log_print(ANDROID_LOG_ERROR, "PoDoFo", "Exception destroying PdfPainter: %s", e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeFinishDrawing(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            painter->FinishDrawing();
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeSetFont(
+        JNIEnv* env, jobject thiz, jlong handle, jlong fontHandle, jdouble fontSize) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            auto* font = reinterpret_cast<PoDoFo::PdfFont*>(fontHandle);
+            painter->TextState.SetFont(*font, fontSize);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeDrawText(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jText, jdouble x, jdouble y) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            painter->DrawText(jstringToString(env, jText), x, y);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeDrawLine(
+        JNIEnv* env, jobject thiz, jlong handle, jdouble x1, jdouble y1, jdouble x2, jdouble y2) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            painter->DrawLine(x1, y1, x2, y2);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeDrawRectangle(
+        JNIEnv* env, jobject thiz, jlong handle, jdouble x, jdouble y, jdouble width, jdouble height, jboolean fill) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            auto mode = fill ? PoDoFo::PdfPathDrawMode::Fill : PoDoFo::PdfPathDrawMode::Stroke;
+            painter->DrawRectangle(x, y, width, height, mode);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeDrawCircle(
+        JNIEnv* env, jobject thiz, jlong handle, jdouble x, jdouble y, jdouble radius, jboolean fill) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            auto mode = fill ? PoDoFo::PdfPathDrawMode::Fill : PoDoFo::PdfPathDrawMode::Stroke;
+            painter->DrawCircle(x, y, radius, mode);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeSetStrokingColorRGB(
+        JNIEnv* env, jobject thiz, jlong handle, jdouble red, jdouble green, jdouble blue) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            painter->GraphicsState.SetStrokingColor(PoDoFo::PdfColor(red, green, blue));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeSetNonStrokingColorRGB(
+        JNIEnv* env, jobject thiz, jlong handle, jdouble red, jdouble green, jdouble blue) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            painter->GraphicsState.SetNonStrokingColor(PoDoFo::PdfColor(red, green, blue));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeSave(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            painter->Save();
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPainter_nativeRestore(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        try {
+            auto* painter = reinterpret_cast<PoDoFo::PdfPainter*>(handle);
+            painter->Restore();
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    // ---- PdfField ----
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfField_nativeGetFieldType(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* field = reinterpret_cast<PoDoFo::PdfField*>(handle);
+        switch (field->GetType()) {
+            case PoDoFo::PdfFieldType::PushButton: return stringToJstring(env, "PushButton");
+            case PoDoFo::PdfFieldType::CheckBox: return stringToJstring(env, "CheckBox");
+            case PoDoFo::PdfFieldType::RadioButton: return stringToJstring(env, "RadioButton");
+            case PoDoFo::PdfFieldType::TextBox: return stringToJstring(env, "TextBox");
+            case PoDoFo::PdfFieldType::ComboBox: return stringToJstring(env, "ComboBox");
+            case PoDoFo::PdfFieldType::ListBox: return stringToJstring(env, "ListBox");
+            case PoDoFo::PdfFieldType::Signature: return stringToJstring(env, "Signature");
+            default: return stringToJstring(env, "Unknown");
+        }
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfField_nativeGetFullName(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        try {
+            auto* field = reinterpret_cast<PoDoFo::PdfField*>(handle);
+            return stringToJstring(env, field->GetFullName());
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return nullptr;
+        }
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfField_nativeGetText(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* field = reinterpret_cast<PoDoFo::PdfField*>(handle);
+        auto* textBox = dynamic_cast<PoDoFo::PdfTextBox*>(field);
+        if (textBox == nullptr) {
+            throwJavaException(env, "Field is not a TextBox");
+            return nullptr;
+        }
+        auto text = textBox->GetText();
+        return text.has_value() ? stringToJstring(env, std::string(text.value().GetString())) : nullptr;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfField_nativeSetText(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jText) {
+
+        auto* field = reinterpret_cast<PoDoFo::PdfField*>(handle);
+        auto* textBox = dynamic_cast<PoDoFo::PdfTextBox*>(field);
+        if (textBox == nullptr) {
+            throwJavaException(env, "Field is not a TextBox");
+            return;
+        }
+        if (jText == nullptr) {
+            textBox->SetText(nullptr);
+        } else {
+            textBox->SetText(PoDoFo::PdfString(jstringToString(env, jText)));
+        }
+    }
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfField_nativeIsChecked(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* field = reinterpret_cast<PoDoFo::PdfField*>(handle);
+        auto* toggle = dynamic_cast<PoDoFo::PdfToggleButton*>(field);
+        if (toggle == nullptr) {
+            throwJavaException(env, "Field is not a CheckBox/RadioButton");
+            return JNI_FALSE;
+        }
+        return toggle->IsChecked() ? JNI_TRUE : JNI_FALSE;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfField_nativeSetChecked(
+        JNIEnv* env, jobject thiz, jlong handle, jboolean checked) {
+
+        auto* field = reinterpret_cast<PoDoFo::PdfField*>(handle);
+        auto* toggle = dynamic_cast<PoDoFo::PdfToggleButton*>(field);
+        if (toggle == nullptr) {
+            throwJavaException(env, "Field is not a CheckBox/RadioButton");
+            return;
+        }
+        toggle->SetChecked(checked == JNI_TRUE);
+    }
+
+    // ---- PdfAnnotation ----
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfAnnotation_nativeGetAnnotationType(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* annot = reinterpret_cast<PoDoFo::PdfAnnotation*>(handle);
+        switch (annot->GetType()) {
+            case PoDoFo::PdfAnnotationType::Text: return stringToJstring(env, "Text");
+            case PoDoFo::PdfAnnotationType::Link: return stringToJstring(env, "Link");
+            case PoDoFo::PdfAnnotationType::FreeText: return stringToJstring(env, "FreeText");
+            case PoDoFo::PdfAnnotationType::Line: return stringToJstring(env, "Line");
+            case PoDoFo::PdfAnnotationType::Square: return stringToJstring(env, "Square");
+            case PoDoFo::PdfAnnotationType::Circle: return stringToJstring(env, "Circle");
+            case PoDoFo::PdfAnnotationType::Polygon: return stringToJstring(env, "Polygon");
+            case PoDoFo::PdfAnnotationType::PolyLine: return stringToJstring(env, "PolyLine");
+            case PoDoFo::PdfAnnotationType::Highlight: return stringToJstring(env, "Highlight");
+            case PoDoFo::PdfAnnotationType::Underline: return stringToJstring(env, "Underline");
+            case PoDoFo::PdfAnnotationType::Squiggly: return stringToJstring(env, "Squiggly");
+            case PoDoFo::PdfAnnotationType::StrikeOut: return stringToJstring(env, "StrikeOut");
+            case PoDoFo::PdfAnnotationType::Stamp: return stringToJstring(env, "Stamp");
+            case PoDoFo::PdfAnnotationType::Caret: return stringToJstring(env, "Caret");
+            case PoDoFo::PdfAnnotationType::Ink: return stringToJstring(env, "Ink");
+            case PoDoFo::PdfAnnotationType::Popup: return stringToJstring(env, "Popup");
+            case PoDoFo::PdfAnnotationType::FileAttachement: return stringToJstring(env, "FileAttachement");
+            case PoDoFo::PdfAnnotationType::Sound: return stringToJstring(env, "Sound");
+            case PoDoFo::PdfAnnotationType::Movie: return stringToJstring(env, "Movie");
+            case PoDoFo::PdfAnnotationType::Widget: return stringToJstring(env, "Widget");
+            case PoDoFo::PdfAnnotationType::Screen: return stringToJstring(env, "Screen");
+            case PoDoFo::PdfAnnotationType::PrinterMark: return stringToJstring(env, "PrinterMark");
+            case PoDoFo::PdfAnnotationType::TrapNet: return stringToJstring(env, "TrapNet");
+            case PoDoFo::PdfAnnotationType::Watermark: return stringToJstring(env, "Watermark");
+            case PoDoFo::PdfAnnotationType::Model3D: return stringToJstring(env, "Model3D");
+            case PoDoFo::PdfAnnotationType::RichMedia: return stringToJstring(env, "RichMedia");
+            case PoDoFo::PdfAnnotationType::WebMedia: return stringToJstring(env, "WebMedia");
+            case PoDoFo::PdfAnnotationType::Redact: return stringToJstring(env, "Redact");
+            case PoDoFo::PdfAnnotationType::Projection: return stringToJstring(env, "Projection");
+            default: return stringToJstring(env, "Unknown");
+        }
+    }
+
+    JNIEXPORT jdoubleArray JNICALL Java_com_podofo_android_PdfAnnotation_nativeGetRect(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* annot = reinterpret_cast<PoDoFo::PdfAnnotation*>(handle);
+        auto rect = annot->GetRect();
+        jdoubleArray result = env->NewDoubleArray(4);
+        jdouble values[4] = { rect.X, rect.Y, rect.Width, rect.Height };
+        env->SetDoubleArrayRegion(result, 0, 4, values);
+        return result;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfAnnotation_nativeSetRect(
+        JNIEnv* env, jobject thiz, jlong handle, jdouble x, jdouble y, jdouble width, jdouble height) {
+
+        auto* annot = reinterpret_cast<PoDoFo::PdfAnnotation*>(handle);
+        annot->SetRect(PoDoFo::Rect(x, y, width, height));
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfAnnotation_nativeGetContents(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* annot = reinterpret_cast<PoDoFo::PdfAnnotation*>(handle);
+        auto contents = annot->GetContents();
+        return contents.has_value() ? stringToJstring(env, std::string(contents.value().GetString())) : nullptr;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfAnnotation_nativeSetContents(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jContents) {
+
+        auto* annot = reinterpret_cast<PoDoFo::PdfAnnotation*>(handle);
+        if (jContents == nullptr) {
+            annot->SetContents(nullptr);
+        } else {
+            annot->SetContents(PoDoFo::PdfString(jstringToString(env, jContents)));
+        }
+    }
+
+    // ---- PdfOutlineItem ----
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfOutlineItem_nativeGetTitle(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* item = reinterpret_cast<PoDoFo::PdfOutlineItem*>(handle);
+        return stringToJstring(env, std::string(item->GetTitle().GetString()));
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfOutlineItem_nativeSetTitle(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jTitle) {
+
+        auto* item = reinterpret_cast<PoDoFo::PdfOutlineItem*>(handle);
+        item->SetTitle(PoDoFo::PdfString(jstringToString(env, jTitle)));
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfOutlineItem_nativeCreateChild(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jTitle) {
+
+        try {
+            auto* item = reinterpret_cast<PoDoFo::PdfOutlineItem*>(handle);
+            auto& child = item->CreateChild(PoDoFo::PdfString(jstringToString(env, jTitle)));
+            return reinterpret_cast<jlong>(&child);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfOutlineItem_nativeCreateNext(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jTitle) {
+
+        try {
+            auto* item = reinterpret_cast<PoDoFo::PdfOutlineItem*>(handle);
+            auto& next = item->CreateNext(PoDoFo::PdfString(jstringToString(env, jTitle)));
+            return reinterpret_cast<jlong>(&next);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfOutlineItem_nativeGetFirst(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* item = reinterpret_cast<PoDoFo::PdfOutlineItem*>(handle);
+        auto* first = item->First();
+        return reinterpret_cast<jlong>(first);
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfOutlineItem_nativeGetNext(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* item = reinterpret_cast<PoDoFo::PdfOutlineItem*>(handle);
+        auto* next = item->Next();
+        return reinterpret_cast<jlong>(next);
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfOutlineItem_nativeGetParent(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* item = reinterpret_cast<PoDoFo::PdfOutlineItem*>(handle);
+        auto* parent = item->GetParentOutline();
+        return reinterpret_cast<jlong>(parent);
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfOutlineItem_nativeSetDestinationToPage(
+        JNIEnv* env, jobject thiz, jlong handle, jlong pageHandle) {
+
+        try {
+            auto* item = reinterpret_cast<PoDoFo::PdfOutlineItem*>(handle);
+            auto* page = reinterpret_cast<PoDoFo::PdfPage*>(pageHandle);
+            // PdfDestination's constructors are private (friend-only); the
+            // public way to obtain one is PdfDocument::CreateDestination().
+            auto dest = page->GetDocument().CreateDestination();
+            dest->SetDestination(*page, PoDoFo::PdfDestinationFit::Fit);
+            item->SetDestination(*dest);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
     }
 }
