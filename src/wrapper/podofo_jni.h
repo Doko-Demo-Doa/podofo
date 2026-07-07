@@ -93,6 +93,71 @@ extern "C"
 
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeGetCertificateIssuerUrlFromCertificate(
         JNIEnv *env, jobject thiz, jlong nativeHandle, jstring jBase64Cert);
+
+    // PdfDocument (PoDoFo::PdfMemDocument) — core document I/O + pages.
+    // Unlike PoDoFoWrapper above, these operate directly on PoDoFo types via
+    // reinterpret_cast, with no intermediate wrapper class: PdfMemDocument/
+    // PdfPage already expose exactly what's needed, so there's no extra state
+    // to track. nativeCreate/nativeLoad are `static native` in Java (no
+    // receiver instance yet), hence `jclass` instead of `jobject` here.
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreate(
+        JNIEnv *env, jclass clazz);
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeLoad(
+        JNIEnv *env, jclass clazz, jstring jPath, jstring jPassword);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSave(
+        JNIEnv *env, jobject thiz, jlong handle, jstring jPath);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeClose(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetPageCount(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetPage(
+        JNIEnv *env, jobject thiz, jlong handle, jint index);
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreatePage(
+        JNIEnv *env, jobject thiz, jlong handle, jdouble width, jdouble height);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeRemovePageAt(
+        JNIEnv *env, jobject thiz, jlong handle, jint index);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetTitle(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetTitle(
+        JNIEnv *env, jobject thiz, jlong handle, jstring jTitle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetAuthor(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetAuthor(
+        JNIEnv *env, jobject thiz, jlong handle, jstring jAuthor);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetSubject(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetSubject(
+        JNIEnv *env, jobject thiz, jlong handle, jstring jSubject);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetCreator(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetCreator(
+        JNIEnv *env, jobject thiz, jlong handle, jstring jCreator);
+
+    // PdfPage (PoDoFo::PdfPage) — non-owning: the page is owned by its parent
+    // document's page tree, so there is deliberately no nativeClose/delete here.
+    JNIEXPORT jdouble JNICALL Java_com_podofo_android_PdfPage_nativeGetWidth(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jdouble JNICALL Java_com_podofo_android_PdfPage_nativeGetHeight(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfPage_nativeGetIndex(
+        JNIEnv *env, jobject thiz, jlong handle);
 }
 
 #endif // PODOFO_JNI_H

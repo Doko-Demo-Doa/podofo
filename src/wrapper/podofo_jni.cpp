@@ -608,4 +608,194 @@ extern "C" {
             return nullptr;
         }
     }
+
+    // ---- PdfDocument / PdfPage ----
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreate(
+        JNIEnv* env, jclass clazz) {
+
+        try {
+            auto* doc = new PoDoFo::PdfMemDocument();
+            return reinterpret_cast<jlong>(doc);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeLoad(
+        JNIEnv* env, jclass clazz, jstring jPath, jstring jPassword) {
+
+        auto* doc = new PoDoFo::PdfMemDocument();
+        try {
+            std::string path = jstringToString(env, jPath);
+            std::string password = jPassword ? jstringToString(env, jPassword) : std::string();
+            doc->Load(path, password);
+            return reinterpret_cast<jlong>(doc);
+        } catch (const std::exception& e) {
+            delete doc;
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSave(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jPath) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            doc->Save(jstringToString(env, jPath));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeClose(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        if (handle) {
+            delete reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        }
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetPageCount(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        return static_cast<jint>(doc->GetPages().GetCount());
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetPage(
+        JNIEnv* env, jobject thiz, jlong handle, jint index) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto& page = doc->GetPages().GetPageAt(static_cast<unsigned>(index));
+            return reinterpret_cast<jlong>(&page);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreatePage(
+        JNIEnv* env, jobject thiz, jlong handle, jdouble width, jdouble height) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto& page = doc->GetPages().CreatePage(PoDoFo::Rect(0, 0, width, height));
+            return reinterpret_cast<jlong>(&page);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeRemovePageAt(
+        JNIEnv* env, jobject thiz, jlong handle, jint index) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            doc->GetPages().RemovePageAt(static_cast<unsigned>(index));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetTitle(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        auto title = doc->GetMetadata().GetTitle();
+        return title.has_value() ? stringToJstring(env, std::string(title.value().GetString())) : nullptr;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetTitle(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jTitle) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        if (jTitle == nullptr) {
+            doc->GetMetadata().SetTitle(nullptr);
+        } else {
+            doc->GetMetadata().SetTitle(PoDoFo::PdfString(jstringToString(env, jTitle)));
+        }
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetAuthor(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        auto author = doc->GetMetadata().GetAuthor();
+        return author.has_value() ? stringToJstring(env, std::string(author.value().GetString())) : nullptr;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetAuthor(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jAuthor) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        if (jAuthor == nullptr) {
+            doc->GetMetadata().SetAuthor(nullptr);
+        } else {
+            doc->GetMetadata().SetAuthor(PoDoFo::PdfString(jstringToString(env, jAuthor)));
+        }
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetSubject(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        auto subject = doc->GetMetadata().GetSubject();
+        return subject.has_value() ? stringToJstring(env, std::string(subject.value().GetString())) : nullptr;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetSubject(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jSubject) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        if (jSubject == nullptr) {
+            doc->GetMetadata().SetSubject(nullptr);
+        } else {
+            doc->GetMetadata().SetSubject(PoDoFo::PdfString(jstringToString(env, jSubject)));
+        }
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetCreator(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        auto creator = doc->GetMetadata().GetCreator();
+        return creator.has_value() ? stringToJstring(env, std::string(creator.value().GetString())) : nullptr;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetCreator(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jCreator) {
+
+        auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+        if (jCreator == nullptr) {
+            doc->GetMetadata().SetCreator(nullptr);
+        } else {
+            doc->GetMetadata().SetCreator(PoDoFo::PdfString(jstringToString(env, jCreator)));
+        }
+    }
+
+    JNIEXPORT jdouble JNICALL Java_com_podofo_android_PdfPage_nativeGetWidth(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+        return page->GetRect().Width;
+    }
+
+    JNIEXPORT jdouble JNICALL Java_com_podofo_android_PdfPage_nativeGetHeight(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+        return page->GetRect().Height;
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfPage_nativeGetIndex(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+        return static_cast<jint>(page->GetIndex());
+    }
 }
