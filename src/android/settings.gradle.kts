@@ -19,4 +19,4 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "leiacare-lib-android-podofo"
+rootProject.name = "podofo-android"

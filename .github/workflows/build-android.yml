@@ -63,12 +63,18 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then
             echo "is_release=true" >> "$GITHUB_OUTPUT"
             echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "artifact_suffix=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
           elif [ -n "${{ inputs.publish_version }}" ]; then
             echo "is_release=true" >> "$GITHUB_OUTPUT"
             echo "version=${{ inputs.publish_version }}" >> "$GITHUB_OUTPUT"
+            echo "artifact_suffix=${{ inputs.publish_version }}" >> "$GITHUB_OUTPUT"
           else
             echo "is_release=false" >> "$GITHUB_OUTPUT"
             echo "version=" >> "$GITHUB_OUTPUT"
+            # No real version outside a release build (always the same
+            # gradle.properties SNAPSHOT) — use the short SHA instead so
+            # artifacts from different runs are still distinguishable.
+            echo "artifact_suffix=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up JDK 17
@@ -175,7 +181,7 @@ jobs:
       - name: Upload AAR artifact
         uses: actions/upload-artifact@v7
         with:
-          name: podofo-android-aar
+          name: podofo-android-aar-${{ steps.release.outputs.artifact_suffix }}
           path: src/android/build/outputs/aar/*.aar
 
       - name: Publish to GitHub Packages
@@ -231,7 +237,7 @@ jobs:
           # repository pointed at GitHub Releases (see README_extended.md),
           # instead of only being a manual-download link.
           VERSION="${{ steps.release.outputs.version }}"
-          MODULE="leiacare-lib-android-podofo"  # must match rootProject.name in src/android/settings.gradle.kts
+          MODULE="podofo-android"  # must match rootProject.name in src/android/settings.gradle.kts
           mkdir -p release-assets
           cp "src/android/build/outputs/aar/${MODULE}-release.aar" "release-assets/${MODULE}-${VERSION}.aar"
           cp "src/android/build/outputs/aar/${MODULE}-debug.aar" "release-assets/${MODULE}-${VERSION}-debug.aar"
