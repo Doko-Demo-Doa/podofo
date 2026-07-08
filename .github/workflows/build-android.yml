@@ -223,8 +223,12 @@ jobs:
         run: ./gradlew publishToMavenCentral -Pversion="${{ steps.release.outputs.version }}"
 
       # Only for an actual tag push, not a workflow_dispatch re-publish of an
-      # already-released version — otherwise re-running the dispatch input
-      # would try (and fail) to create a duplicate release for the same tag.
+      # already-released version. build-ios.yml triggers on the same tag
+      # pattern and uploads its own asset (the XCFramework) to this same
+      # release — whichever workflow's job reaches this step first creates
+      # the release, the other just uploads into it, so both platforms'
+      # artifacts land on one combined release per version tag instead of
+      # each workflow trying (and one failing) to create its own.
       - name: Create GitHub Release
         if: github.ref_type == 'tag'
         env:
@@ -241,7 +245,11 @@ jobs:
           mkdir -p release-assets
           cp "src/android/build/outputs/aar/${MODULE}-release.aar" "release-assets/${MODULE}-${VERSION}.aar"
           cp "src/android/build/outputs/aar/${MODULE}-debug.aar" "release-assets/${MODULE}-${VERSION}-debug.aar"
-          gh release create "${{ github.ref_name }}" \
-              --title "${{ github.ref_name }}" \
-              --generate-notes \
-              release-assets/*.aar
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release upload "${{ github.ref_name }}" release-assets/*.aar --clobber
+          else
+            gh release create "${{ github.ref_name }}" \
+                --title "${{ github.ref_name }}" \
+                --generate-notes \
+                release-assets/*.aar
+          fi
