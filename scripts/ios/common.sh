@@ -27,6 +27,18 @@ else
     NPROC="$(sysctl -n hw.ncpu)"
 fi
 
+# libxml2's autogen.sh (needed since we build from a git tag archive, which
+# ships no pre-generated configure script) requires GNU libtool/libtoolize.
+# macOS ships an unrelated Apple `libtool`; Homebrew's libtool installs the
+# GNU one under a "g" prefix specifically to avoid clashing with it, and
+# recommends prepending its gnubin dir to PATH to get the normal names back
+# — same fix scripts/android/common.sh already needed for the same reason.
+if [ -d "/opt/homebrew/opt/libtool/libexec/gnubin" ]; then
+    PATH="/opt/homebrew/opt/libtool/libexec/gnubin:$PATH"
+elif [ -d "/usr/local/opt/libtool/libexec/gnubin" ]; then
+    PATH="/usr/local/opt/libtool/libexec/gnubin:$PATH"
+fi
+
 # Several vendored dependency CMakeLists.txt files (eg. brotli, harfbuzz) declare
 # an old cmake_minimum_required() that CMake >= 4.0 refuses to configure at all
 # ("Compatibility with CMake < 3.5 has been removed"). This env var is CMake's
