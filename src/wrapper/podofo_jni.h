@@ -317,6 +317,14 @@ extern "C"
     JNIEXPORT jobject JNICALL Java_com_podofo_android_PdfSignature_nativeParseContents(
         JNIEnv *env, jobject thiz, jlong handle);
 
+    // Returns a PdfSignatureVerifyStatus ordinal (see PdfSignature.VerifyStatus
+    // in Java, which mirrors it exactly) as a jint.
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfSignature_nativeVerifySignature(
+        JNIEnv *env, jobject thiz, jlong handle, jbyteArray jSignedData);
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfSignature_nativeVerifySignatureFromPath(
+        JNIEnv *env, jobject thiz, jlong handle, jstring jDocumentPath);
+
     // PdfAnnotation (PoDoFo::PdfAnnotation) — non-owning, like PdfField:
     // owned by its page's annotation collection.
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfAnnotation_nativeGetAnnotationType(

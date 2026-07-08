@@ -1558,6 +1558,47 @@ extern "C" {
         }
     }
 
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfSignature_nativeVerifySignature(
+        JNIEnv* env, jobject thiz, jlong handle, jbyteArray jSignedData) {
+
+        try {
+            auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+
+            PoDoFo::PdfSignatureContents contents;
+            if (!signature->TryGetSignatureContents(contents) || !contents.IsValid())
+                return static_cast<jint>(PoDoFo::PdfSignatureVerifyStatus::CouldNotVerify);
+
+            jsize length = env->GetArrayLength(jSignedData);
+            jbyte* bytes = env->GetByteArrayElements(jSignedData, nullptr);
+            if (bytes == nullptr)
+                return static_cast<jint>(PoDoFo::PdfSignatureVerifyStatus::CouldNotVerify);
+
+            PoDoFo::bufferview signedData(reinterpret_cast<const char*>(bytes), static_cast<size_t>(length));
+            auto status = contents.VerifySignature(signedData);
+            env->ReleaseByteArrayElements(jSignedData, bytes, JNI_ABORT);
+
+            return static_cast<jint>(status);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return static_cast<jint>(PoDoFo::PdfSignatureVerifyStatus::CouldNotVerify);
+        }
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfSignature_nativeVerifySignatureFromPath(
+        JNIEnv* env, jobject thiz, jlong handle, jstring jDocumentPath) {
+
+        try {
+            auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
+            std::string documentPath = jstringToString(env, jDocumentPath);
+
+            PoDoFo::FileStreamDevice device(documentPath);
+            return static_cast<jint>(signature->TryVerifySignature(device));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return static_cast<jint>(PoDoFo::PdfSignatureVerifyStatus::CouldNotVerify);
+        }
+    }
+
     // ---- PdfAnnotation ----
 
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfAnnotation_nativeGetAnnotationType(

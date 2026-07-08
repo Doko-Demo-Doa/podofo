@@ -634,6 +634,53 @@ TEST_CASE("TestSignatureInfoFreshSign")
     // attribute and rely on /M in the PDF dictionary instead.
 }
 
+TEST_CASE("TestSignatureVerify")
+{
+    charbuff currBuffer;
+    auto inputPath = TestUtils::GetTestInputFilePath("TestSignature.pdf");
+    utls::ReadTo(currBuffer, inputPath);
+    auto inputOutput = std::make_shared<BufferStreamDevice>(currBuffer);
+
+    string cert;
+    TestUtils::ReadTestInputFile("mycert.der", cert);
+
+    string pkey;
+    TestUtils::ReadTestInputFile("mykey-pkcs8.der", pkey);
+
+    PdfMemDocument doc(inputOutput);
+    auto& page = doc.GetPages().GetPageAt(0);
+    auto& annot = page.GetAnnotations().GetAnnotAt(0);
+    auto& field = dynamic_cast<PdfAnnotationWidget&>(annot).GetField();
+    auto& signature = dynamic_cast<PdfSignature&>(field);
+
+    auto signer = PdfSignerCms(cert, pkey);
+    PoDoFo::SignDocument(doc, *inputOutput, signer, signature, PdfSaveOptions::NoMetadataUpdate);
+
+    // Reload and verify against the actual signed bytes
+    doc.Load(inputOutput);
+    auto& signature2 = dynamic_cast<PdfSignature&>(
+        dynamic_cast<PdfAnnotationWidget&>(
+            doc.GetPages().GetPageAt(0).GetAnnotations().GetAnnotAt(0)).GetField());
+
+    REQUIRE(signature2.TryVerifySignature(*inputOutput) == PdfSignatureVerifyStatus::ValidNoTrust);
+
+    // Tamper with a byte inside the first /ByteRange span (currBuffer is the
+    // actual backing storage inputOutput reads/writes through, so mutating it
+    // directly here is equivalent to the underlying file being modified after
+    // signing) and confirm verification now correctly reports Invalid, rather
+    // than the check trivially always succeeding regardless of content.
+    auto byteRange = signature2.GetByteRange();
+    REQUIRE(byteRange.has_value());
+    int64_t offset1;
+    REQUIRE(byteRange->TryGetAtAs(0, offset1));
+
+    size_t tamperOffset = (size_t)offset1 + 50;
+    REQUIRE(tamperOffset < currBuffer.size());
+    currBuffer[tamperOffset] = (char)(currBuffer[tamperOffset] ^ 0x7F);
+
+    REQUIRE(signature2.TryVerifySignature(*inputOutput) == PdfSignatureVerifyStatus::Invalid);
+}
+
 TEST_CASE("TestSignatureInfoPkcs7SigningTime")
 {
     charbuff currBuffer;

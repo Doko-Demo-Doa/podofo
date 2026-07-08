@@ -90,6 +90,73 @@ public class PdfSignature {
     return nativeParseContents(nativeHandle);
   }
 
+  /**
+   * Cryptographically verifies this signature against the actual bytes of
+   * the PDF file it belongs to (reads /ByteRange from the file at
+   * {@code documentPath} directly — no need to extract the bytes yourself).
+   *
+   * <p><b>Does NOT validate the signer's certificate chain of trust</b> — no
+   * trust store or revocation checking is performed. A {@link VerifyStatus#VALID_NO_TRUST}
+   * result means the signature is cryptographically self-consistent (the
+   * document wasn't tampered with and the signature matches the embedded
+   * certificate), not that the certificate should be trusted.
+   *
+   * @param documentPath path to the (signed) PDF file this signature came from
+   */
+  public VerifyStatus verifySignature(String documentPath) {
+    if (documentPath == null) {
+      throw new IllegalArgumentException("documentPath must not be null");
+    }
+    return VerifyStatus.fromNative(nativeVerifySignatureFromPath(nativeHandle, documentPath));
+  }
+
+  /**
+   * Cryptographically verifies this signature against caller-supplied
+   * bytes — the exact document content covered by {@link #getByteRange()},
+   * with the /Contents entry itself excluded. Use
+   * {@link #verifySignature(String)} instead unless you already have these
+   * exact bytes for another reason.
+   *
+   * <p>Same trust caveat as {@link #verifySignature(String)}: does NOT
+   * validate the signer's certificate chain of trust.
+   */
+  public VerifyStatus verifySignature(byte[] signedData) {
+    if (signedData == null) {
+      throw new IllegalArgumentException("signedData must not be null");
+    }
+    return VerifyStatus.fromNative(nativeVerifySignature(nativeHandle, signedData));
+  }
+
+  /** Result of {@link #verifySignature(byte[])}/{@link #verifySignature(String)}. */
+  public enum VerifyStatus {
+    /**
+     * The signature could not be checked at all (missing /ByteRange,
+     * malformed CMS/PKCS7 data, I/O error reading the document, etc.).
+     * Distinct from {@link #INVALID} — this means "unable to tell", not
+     * "checked, and it's wrong".
+     */
+    COULD_NOT_VERIFY,
+
+    /**
+     * The signature does not match the given bytes, or is otherwise
+     * cryptographically invalid (eg. the document was modified after
+     * signing).
+     */
+    INVALID,
+
+    /**
+     * The signature is cryptographically valid over the given bytes.
+     *
+     * <p>This does NOT mean the signer's certificate should be trusted: no
+     * certificate chain or revocation checking is performed.
+     */
+    VALID_NO_TRUST;
+
+    private static VerifyStatus fromNative(int value) {
+      return values()[value];
+    }
+  }
+
   private native boolean nativeHasSignatureValue(long handle);
   private native String nativeGetFilter(long handle);
   private native String nativeGetSubFilter(long handle);
@@ -103,4 +170,6 @@ public class PdfSignature {
   private native String nativeGetPropBuild(long handle);
   private native byte[] nativeGetContents(long handle);
   private native PdfSignatureContents nativeParseContents(long handle);
+  private native int nativeVerifySignature(long handle, byte[] signedData);
+  private native int nativeVerifySignatureFromPath(long handle, String documentPath);
 }
