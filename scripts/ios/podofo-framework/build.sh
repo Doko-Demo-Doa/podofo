@@ -66,7 +66,9 @@ for SLICE in "${IOS_SLICES[@]}"; do
     OBJS=()
     for src in "$BRIDGE_SRC_DIR"/*.mm; do
         obj="$OBJ_DIR/$(basename "${src%.mm}").o"
-        clang++ -c -fobjc-arc -fmodules -std=c++17 -stdlib=libc++ \
+        # $CXX (not a literal clang++) — already ccache-wrapped by
+        # ios_slice_env above.
+        $CXX -c -fobjc-arc -fmodules -std=c++17 -stdlib=libc++ \
             $CFLAGS_ARCH -O2 \
             -I "$ORGANIZED_LIBS_DIR/$SLICE/include" \
             -I "$BRIDGE_SRC_DIR" \
@@ -77,7 +79,11 @@ for SLICE in "${IOS_SLICES[@]}"; do
     echo "=== Combining static libs for $SLICE ==="
     SLICE_LIB_DIR="$OUTPUT_DIR/slice/$SLICE"
     mkdir -p "$SLICE_LIB_DIR"
-    libtool -static -o "$SLICE_LIB_DIR/PoDoFo.a" \
+    # /usr/bin/libtool explicitly, not a bare `libtool`: common.sh prepends
+    # Homebrew's GNU libtool (needed for libxml2's autogen.sh) onto PATH,
+    # and GNU libtool has no `-static` mode at all ("unrecognised option")
+    # — only Apple's own libtool does, so this must bypass the PATH lookup.
+    /usr/bin/libtool -static -o "$SLICE_LIB_DIR/PoDoFo.a" \
         "$ORGANIZED_LIBS_DIR/$SLICE/lib/"*.a \
         "${OBJS[@]}"
 done

@@ -21,10 +21,13 @@ INSTALL_DIR="$TARGET_DIR/install"
 
 # OpenSSL ships its own named Configure targets for iOS (see
 # Configurations/15-ios.conf in its source tree) that already wrap
-# `xcrun -sdk <sdk> cc` internally, so no explicit CC override is needed here
-# — just the target name for each slice. Not a `declare -A` associative
-# array: macOS ships bash 3.2 (GPLv3 avoidance), which doesn't have them —
-# a plain function keeps this working under the system /bin/bash.
+# `xcrun -sdk <sdk> cc` internally, so the target name alone would be enough
+# to cross-compile — but that baked-in CC bypasses ccache entirely. Configure
+# lets an explicit CC= environment variable override the target's own
+# default, so ios_slice_env's already-ccache-wrapped $CC (below) is passed
+# alongside the target name instead of relying on it. Not a `declare -A`
+# associative array: macOS ships bash 3.2 (GPLv3 avoidance), which doesn't
+# have them — a plain function keeps this working under the system /bin/bash.
 openssl_target_for_slice() {
     case "$1" in
         ios-arm64) echo "ios64-xcrun" ;;
@@ -67,6 +70,19 @@ function build() {
         echo "Building for $SLICE..."
 
         TARGET="$(openssl_target_for_slice "$SLICE")"
+        ios_slice_env "$SLICE"
+
+        # NOTE: deliberately NOT using ios_slice_env's own $CC here (an
+        # absolute clang path) — that drops the automatic -isysroot
+        # `xcrun -sdk <sdk> cc` injects as part of its normal driver
+        # behavior, which the ios64-xcrun/iossimulator-*-xcrun targets rely
+        # on implicitly (their own `cflags` never set -isysroot explicitly).
+        # Overriding CC with a bare clang path breaks standard header
+        # resolution ("'string.h' file not found") for exactly that reason.
+        # Wrapping the same `xcrun -sdk ... cc` invocation the target
+        # already uses keeps that behavior intact while still routing
+        # through ccache.
+        CC="$(with_ccache "xcrun -sdk $SDK cc")"
 
         # OpenSSL's own build system does its own in-place object build per
         # Configure invocation, so each slice gets a fresh copy of the source
@@ -77,6 +93,7 @@ function build() {
         cp -r "$BUILD_DIR/openssl-$OPENSSL_VERSION" "$ARCH_BUILD_DIR"
         cd "$ARCH_BUILD_DIR"
 
+        CC="$CC" \
         ./Configure "$TARGET" \
             --prefix="$INSTALL_DIR/$SLICE" \
             --openssldir="$INSTALL_DIR/$SLICE" \
