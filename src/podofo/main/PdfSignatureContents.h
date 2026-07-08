@@ -53,6 +53,11 @@ public:
     /// @param contents raw bytes from the PDF /Contents entry
     explicit PdfSignatureContents(const bufferview& contents);
 
+    PdfSignatureContents(const PdfSignatureContents&) = delete;
+    PdfSignatureContents(PdfSignatureContents&&) = default;
+    PdfSignatureContents& operator=(const PdfSignatureContents&) = delete;
+    PdfSignatureContents& operator=(PdfSignatureContents&&) = default;
+
     /// Parse the given raw signature contents.
     /// @param contents raw bytes from the PDF /Contents entry
     /// @returns true if the contents could be parsed as CMS/PKCS7
@@ -69,10 +74,6 @@ public:
     /// @param info output structure that will receive the timestamp info
     /// @returns true if a timestamp token was found and parsed
     bool TryGetTimestampToken(PdfSignatureTimestampInfo& info) const;
-
-private:
-    PdfSignatureContents(const PdfSignatureContents&) = delete;
-    PdfSignatureContents& operator=(const PdfSignatureContents&) = delete;
 
 private:
     bool m_valid;

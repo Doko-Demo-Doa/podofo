@@ -29,12 +29,20 @@ static string getNameString(X509_NAME* name)
     if (name == nullptr)
         return { };
 
-    char* str = X509_NAME_oneline(name, nullptr, 0);
-    if (str == nullptr)
+    BIO* bio = BIO_new(BIO_s_mem());
+    if (bio == nullptr)
         return { };
 
-    string ret(str);
-    OPENSSL_free(str);
+    string ret;
+    if (X509_NAME_print_ex(bio, name, 0, XN_FLAG_RFC2253) >= 0)
+    {
+        char* data;
+        long len = BIO_get_mem_data(bio, &data);
+        if (len > 0)
+            ret.assign(data, (size_t)len);
+    }
+
+    BIO_free(bio);
     return ret;
 }
 
@@ -78,15 +86,11 @@ static bool tryConvertAsn1Time(const ASN1_TIME* time, PdfDate& date)
 
 static int getSignatureTimeStampTokenNid()
 {
-    static int nid = NID_undef;
-    if (nid == NID_undef)
-    {
-        int created = OBJ_create(SignatureTimeStampTokenOid,
-            "id-aa-signatureTimeStampToken",
-            "id-aa-signatureTimeStampToken");
-        if (created != NID_undef)
-            nid = created;
-    }
+    // The initializer of a function-local static is guaranteed by C++11 to run
+    // exactly once, even under concurrent calls, so OBJ_create() can't race here
+    static const int nid = OBJ_create(SignatureTimeStampTokenOid,
+        "id-aa-signatureTimeStampToken",
+        "id-aa-signatureTimeStampToken");
 
     return nid;
 }

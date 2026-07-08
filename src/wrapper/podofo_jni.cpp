@@ -1541,12 +1541,11 @@ extern "C" {
         JNIEnv* env, jobject thiz, jlong handle) {
 
         auto* signature = reinterpret_cast<PoDoFo::PdfSignature*>(handle);
-        PoDoFo::charbuff contents;
-        if (!signature->TryGetContents(contents))
+        PoDoFo::PdfSignatureContents parsed;
+        if (!signature->TryGetSignatureContents(parsed))
             return nullptr;
 
         try {
-            PoDoFo::PdfSignatureContents parsed(contents);
             if (!parsed.IsValid())
             {
                 throwJavaException(env, "Failed to parse signature contents");
