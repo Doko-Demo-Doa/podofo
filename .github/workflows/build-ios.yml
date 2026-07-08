@@ -1,0 +1,171 @@
+name: build-ios
+
+on:
+  push:
+    branches: [ master ]
+    # Path filters are not evaluated for tag pushes (GitHub Actions always runs
+    # the workflow for a matching tag regardless of `paths`), so adding `tags`
+    # here doesn't need its own trigger block: a `vX.Y.Z` tag always triggers a
+    # release build + GitHub Release upload, an ordinary commit to master only
+    # runs when it touches these paths.
+    tags: [ 'v*.*.*' ]
+    paths:
+      - 'src/podofo/**'
+      - 'src/wrapper/ios/**'
+      - 'scripts/ios/**'
+      - '.github/workflows/build-ios.yml'
+  pull_request:
+    branches: [ master ]
+    paths:
+      - 'src/podofo/**'
+      - 'src/wrapper/ios/**'
+      - 'scripts/ios/**'
+      - '.github/workflows/build-ios.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write  # only needed to create the GitHub Release for a tag push, and to commit the updated Package.swift checksum
+
+jobs:
+  build-ios-xcframework:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Determine release version
+        id: release
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "artifact_suffix=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+            echo "version=" >> "$GITHUB_OUTPUT"
+            echo "artifact_suffix=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      # GitHub's macos-15 runner doesn't ship GNU autoconf/automake/libtool
+      # (only Apple's own non-GNU libtool) — needed to regenerate libxml2's
+      # configure script and to build freetype/libpng/libxml2 in general.
+      # Mirrors build-android.yml's own "Install native dependency build
+      # tools" step (apt-get there, brew here).
+      - name: Install native dependency build tools
+        run: brew install autoconf automake libtool pkg-config
+
+      # Speeds up recompiles of unchanged sources across runs — most valuable
+      # for PoDoFo itself, whose build.sh isn't gated by the dependency cache
+      # below and does a fresh `rsync` of the source tree every run (resets
+      # file mtimes, defeating CMake/make's own incremental rebuild even when
+      # content matches). scripts/ios/common.sh wires CC/CXX (or
+      # CMAKE_*_LAUNCHER for CMake-based dependencies) through ccache
+      # whenever it's on PATH.
+      - name: Set up ccache
+        uses: hendrikmuhs/ccache-action@v1.2.23
+        with:
+          key: ios
+          max-size: 2G
+
+      # Building all 8 native dependencies for all 3 slices from source is
+      # the slowest part of this pipeline. Cache it, keyed on the scripts
+      # that produce it (any version bump or fix invalidates the cache
+      # automatically).
+      - name: Cache iOS native dependencies
+        id: cache-deps
+        uses: actions/cache@v6
+        with:
+          path: build/ios
+          key: ios-deps-${{ hashFiles('scripts/ios/*.sh', 'scripts/ios/*.cmake', 'scripts/ios/brotli/**', 'scripts/ios/bzip2/**', 'scripts/ios/freetype/**', 'scripts/ios/libpng/**', 'scripts/ios/libxml2/**', 'scripts/ios/openssl/**', 'scripts/ios/harfbuzz/**', 'scripts/ios/zlib/**') }}
+
+      - name: Build native dependencies (brotli, bzip2, freetype, libpng, libxml2, openssl, harfbuzz, zlib)
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: scripts/ios/build_deps.sh build/ios
+
+      - name: Cross-compile PoDoFo for iOS (all 3 slices)
+        run: |
+          scripts/ios/podofo/build.sh build/ios/podofo \
+              build/ios/freetype/install build/ios/libpng/install \
+              build/ios/libxml2/install build/ios/openssl/install
+
+      - name: Organize native libs for linking
+        run: |
+          scripts/ios/podofo-framework/organize_libs.sh \
+              build/ios/brotli/install build/ios/bzip2/install \
+              build/ios/freetype/install build/ios/harfbuzz/install \
+              build/ios/libpng/install build/ios/libxml2/install \
+              build/ios/openssl/install build/ios/podofo/install \
+              build/ios/zlib/install build/ios/organized
+
+      - name: Build XCFramework
+        run: |
+          scripts/ios/podofo-framework/build.sh \
+              build/ios/organized src/wrapper/ios build/ios/framework
+
+      - name: Verify XCFramework structure
+        run: |
+          plutil -p build/ios/framework/PoDoFo.xcframework/Info.plist
+          lipo -info build/ios/framework/PoDoFo.xcframework/ios-arm64_x86_64-simulator/PoDoFo.a
+
+      - name: Zip XCFramework
+        working-directory: build/ios/framework
+        run: ditto -c -k --sequesterRsrc --keepParent PoDoFo.xcframework "PoDoFo-${{ steps.release.outputs.artifact_suffix }}.xcframework.zip"
+
+      - name: Upload XCFramework artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: podofo-ios-xcframework-${{ steps.release.outputs.artifact_suffix }}
+          path: build/ios/framework/*.xcframework.zip
+
+      # Only for an actual tag push — same reasoning as build-android.yml's
+      # "Create GitHub Release" step. Uploads the zipped XCFramework as a
+      # release asset (this pipeline never commits the binary itself into
+      # git, unlike the reference this was ported from).
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          mv "build/ios/framework/PoDoFo-${VERSION}.xcframework.zip" "PoDoFo-${VERSION}.xcframework.zip"
+          gh release create "${{ github.ref_name }}" \
+              --title "${{ github.ref_name }}" \
+              --generate-notes \
+              "PoDoFo-${VERSION}.xcframework.zip"
+
+      # Keeps the root Package.swift's binaryTarget pointed at this release's
+      # asset with the correct checksum, without ever committing the
+      # xcframework binary itself — the one piece of this pipeline that
+      # deliberately doesn't mirror the reference repo's
+      # commit-the-binary-and-Package.swift-to-git pattern.
+      - name: Update Package.swift for this release
+        if: github.ref_type == 'tag'
+        run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/PoDoFo-${VERSION}.xcframework.zip"
+          CHECKSUM="$(swift package compute-checksum "PoDoFo-${VERSION}.xcframework.zip")"
+          cat > Package.swift << EOF
+          // swift-tools-version:5.7
+          import PackageDescription
+
+          let package = Package(
+              name: "PoDoFo",
+              platforms: [ .iOS(.v17) ],
+              products: [ .library(name: "PoDoFo", targets: ["PoDoFo"]) ],
+              targets: [
+                  .binaryTarget(
+                      name: "PoDoFo",
+                      url: "${URL}",
+                      checksum: "${CHECKSUM}"
+                  )
+              ]
+          )
+          EOF
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Package.swift
+          git commit -m "chore: update Package.swift for ${{ github.ref_name }}" || echo "No changes to commit"
+          git push origin HEAD:master
