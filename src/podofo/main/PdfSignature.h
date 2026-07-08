@@ -19,6 +19,7 @@ namespace PoDoFo {
 
 class PdfAcroForm;
 class PdfSignatureContents;
+enum class PdfSignatureVerifyStatus : uint8_t;
 
 enum class PdfCertPermission : uint8_t
 {
@@ -157,6 +158,22 @@ public:
     /// @param input the input device for the document where to search
     /// @param output the output device that will hold the previous revision
     bool TryGetPreviousRevision(InputStreamDevice& input, OutputStreamDevice& output) const;
+
+    /// Cryptographically verifies this signature against the document's
+    /// actual bytes, read from /ByteRange — a convenience combining
+    /// TryGetSignatureContents() with PdfSignatureContents::VerifySignature().
+    ///
+    /// Does NOT validate the signer's certificate chain of trust — see
+    /// PdfSignatureVerifyStatus.
+    ///
+    /// Thread-safety: safe to call concurrently as long as each call uses its
+    /// own InputStreamDevice, or access to a shared one is externally
+    /// synchronized — this seeks and reads `input`, and a stream's read
+    /// position is inherently not safe to share across threads without
+    /// synchronization, independent of anything this method does itself.
+    ///
+    /// @param input the input device for the document containing this signature
+    PdfSignatureVerifyStatus TryVerifySignature(InputStreamDevice& input) const;
 
 protected:
     PdfObject* getValueObject() const override;

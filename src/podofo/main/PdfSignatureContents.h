@@ -41,6 +41,31 @@ struct PODOFO_API PdfSignatureTimestampInfo
     std::string TsaSubject;
 };
 
+/// Result of PdfSignatureContents::VerifySignature().
+enum class PdfSignatureVerifyStatus : uint8_t
+{
+    /// The signature could not be checked at all: no parsed CMS/PKCS7
+    /// contents to verify against, or the data couldn't be processed.
+    /// This is distinct from Invalid — it means "unable to tell", not
+    /// "checked, and it's wrong".
+    CouldNotVerify = 0,
+
+    /// The CMS signature does not match the given bytes, or is otherwise
+    /// cryptographically invalid (eg. the document was modified after
+    /// signing, or the signature doesn't correspond to the certificate).
+    Invalid,
+
+    /// The CMS signature is cryptographically valid over the given bytes.
+    ///
+    /// This does NOT mean the signer's certificate should be trusted: no
+    /// certificate chain or revocation checking is performed. Read this as
+    /// "the document wasn't tampered with, and the signature matches the
+    /// embedded certificate" — not as "this signature should be trusted".
+    /// Validating the certificate chain against a trust store is a separate,
+    /// unimplemented concern.
+    ValidNoTrust,
+};
+
 /// Parser for the raw CMS/PKCS7 data stored in a PDF signature /Contents entry.
 /// This class extracts signer information and embedded RFC3161 timestamp tokens
 /// without performing cryptographic verification.
@@ -75,10 +100,32 @@ public:
     /// @returns true if a timestamp token was found and parsed
     bool TryGetTimestampToken(PdfSignatureTimestampInfo& info) const;
 
+    /// Cryptographically verifies the parsed CMS signature against the exact
+    /// bytes that were supposedly signed — a PDF's /ByteRange content, with
+    /// the /Contents entry itself excluded (see PdfSignature::TryVerifySignature
+    /// for a convenience that extracts this from a document automatically).
+    /// Does NOT validate the signer's certificate chain of trust — see
+    /// PdfSignatureVerifyStatus.
+    ///
+    /// Thread-safe: this is a const method with no shared mutable state. Each
+    /// call re-parses the retained raw CMS bytes into its own local OpenSSL
+    /// objects (BIO/PKCS7), used and freed entirely within the call, so
+    /// concurrent calls — on the same instance or different ones — never
+    /// contend or race, as long as no other thread is concurrently calling
+    /// TryParse() on the same instance (which does mutate it).
+    ///
+    /// @param signedData the exact document bytes covered by /ByteRange
+    PdfSignatureVerifyStatus VerifySignature(const bufferview& signedData) const;
+
 private:
     bool m_valid;
     std::vector<PdfSignatureSignerInfo> m_signerInfos;
     charbuff m_timestampToken;
+    // Retained (not just parsed-and-discarded, unlike the original design)
+    // so VerifySignature() can re-parse into its own local, call-scoped
+    // PKCS7* on every call, rather than needing to store a live OpenSSL
+    // object as a class member.
+    charbuff m_rawContents;
 };
 
 }
