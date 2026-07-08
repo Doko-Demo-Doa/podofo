@@ -120,10 +120,12 @@ jobs:
           name: podofo-ios-xcframework-${{ steps.release.outputs.artifact_suffix }}
           path: build/ios/framework/*.xcframework.zip
 
-      # Only for an actual tag push — same reasoning as build-android.yml's
-      # "Create GitHub Release" step. Uploads the zipped XCFramework as a
-      # release asset (this pipeline never commits the binary itself into
-      # git, unlike the reference this was ported from).
+      # Only for an actual tag push. build-android.yml triggers on the same
+      # tag pattern and also creates/uploads to this same release — whichever
+      # workflow's job gets here first creates it, the other just uploads its
+      # asset into it, so the AAR and the XCFramework end up on one combined
+      # release per version tag rather than each workflow racing to create
+      # its own (GitHub only allows one release per tag).
       - name: Create GitHub Release
         if: github.ref_type == 'tag'
         env:
@@ -131,10 +133,14 @@ jobs:
         run: |
           VERSION="${{ steps.release.outputs.version }}"
           mv "build/ios/framework/PoDoFo-${VERSION}.xcframework.zip" "PoDoFo-${VERSION}.xcframework.zip"
-          gh release create "${{ github.ref_name }}" \
-              --title "${{ github.ref_name }}" \
-              --generate-notes \
-              "PoDoFo-${VERSION}.xcframework.zip"
+          if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            gh release upload "${{ github.ref_name }}" "PoDoFo-${VERSION}.xcframework.zip" --clobber
+          else
+            gh release create "${{ github.ref_name }}" \
+                --title "${{ github.ref_name }}" \
+                --generate-notes \
+                "PoDoFo-${VERSION}.xcframework.zip"
+          fi
 
       # Keeps the root Package.swift's binaryTarget pointed at this release's
       # asset with the correct checksum, without ever committing the
