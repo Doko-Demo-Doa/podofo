@@ -303,7 +303,7 @@ bool PdfParser::tryRebuildCrossReference(InputStreamDevice& device)
                 {
                     // CHECK-ME: PDFium seems to handle spurious strings
                     // found at random places in the PDF. Does it make sense at all?
-                    m_tokenizer.ReadString(device, variant, nullptr);
+                    m_tokenizer.ReadString(device, variant, nullptr, { true, m_StrictParsing });
                     variant.Reset();
                     break;
                 }
@@ -311,7 +311,7 @@ bool PdfParser::tryRebuildCrossReference(InputStreamDevice& device)
                 {
                     // CHECK-ME: PDFium seems to handle spurious strings
                     // found at random places in the PDF. Does it make sense at all?
-                    m_tokenizer.ReadHexString(device, variant, nullptr);
+                    m_tokenizer.ReadHexString(device, variant, nullptr, { true, m_StrictParsing });
                     variant.Reset();
                     break;
                 }
@@ -324,7 +324,7 @@ bool PdfParser::tryRebuildCrossReference(InputStreamDevice& device)
             return false;
 
         // Finally, remove spurious objects, eg. objects with outdated generations
-        m_Objects->CollectGarbage(*m_Trailer);
+        m_Objects->CollectGarbage(*m_Trailer, true);
 
         // Restore the header
         m_PdfVersion = version;
@@ -1142,7 +1142,7 @@ void PdfParser::updateDocumentVersion()
                     m_PdfVersion = version;
                 }
             }
-            else if (IsStrictParsing())
+            else if (m_StrictParsing)
             {
                 // Version must be of type name, according to PDF Specification
                 PODOFO_RAISE_ERROR(PdfErrorCode::InvalidName);
@@ -1160,7 +1160,7 @@ void PdfParser::checkEOFMarker(InputStreamDevice& device)
     char buff[EOFTokenLen + 1];
 
     device.Seek(-static_cast<ssize_t>(EOFTokenLen), SeekDirection::End);
-    if (IsStrictParsing())
+    if (m_StrictParsing)
     {
         // For strict mode EOF marker must be at the very end of the file
         device.Read(buff, EOFTokenLen);
@@ -1192,9 +1192,9 @@ void PdfParser::checkEOFMarker(InputStreamDevice& device)
         // Try and deal with garbage by offsetting the buffer reads in PdfParser from now on
         if (!found)
             PODOFO_RAISE_ERROR(PdfErrorCode::InvalidEOFToken);
-
-        m_lastEOFOffsetHint = device.GetPosition() - EOFTokenLen;
     }
+
+    m_lastEOFOffsetHint = device.GetPosition() - EOFTokenLen;
 }
 
 void PdfParser::clear()
@@ -1203,6 +1203,15 @@ void PdfParser::clear()
     m_Objects->Clear();
     m_tokenizer.Reset();
     init();
+}
+
+void PdfParser::SetStrictParsing(bool value)
+{
+    m_StrictParsing = value;
+    PdfTokenizerParams params;
+    if (value)
+        params.Flags |= PdfTokenizerFlags::StrictParsing;
+    m_tokenizer.SetParameters(params);
 }
 
 const PdfObject& PdfParser::GetTrailer() const

@@ -24,6 +24,7 @@ PdfDocument::PdfDocument(bool empty) :
     m_Objects(*this),
     m_Metadata(*this),
     m_FontManager(*this),
+    m_IsStrictParsing(false),
     m_InfoLazyLoaded(false),
     m_OutlinesLazyLoaded(false)
 {
@@ -35,6 +36,7 @@ PdfDocument::PdfDocument(const PdfDocument& doc) :
     m_Objects(*this, doc.m_Objects),
     m_Metadata(*this),
     m_FontManager(*this),
+    m_IsStrictParsing(false),
     m_InfoLazyLoaded(false),
     m_OutlinesLazyLoaded(false)
 {
@@ -71,6 +73,7 @@ void PdfDocument::Clear()
     m_AcroForm = nullptr;
     m_Outlines = nullptr;
     m_NameTrees = nullptr;
+    m_IsStrictParsing = false;
     m_InfoLazyLoaded = false;
     m_OutlinesLazyLoaded = false;
     m_Objects.Clear();
@@ -128,18 +131,18 @@ void PdfDocument::AppendDocumentPages(const PdfDocument& doc)
     // TODO: merge name trees
 }
 
-void PdfDocument::InsertDocumentPageAt(unsigned atIndex, const PdfDocument& doc, unsigned pageIndex)
+void PdfDocument::InsertDocumentPageAt(unsigned atIndex, const PdfDocument& doc, unsigned pageIndex,
+    unordered_map<PdfReference, PdfObject*>& mappedObjects)
 {
-    unordered_map<PdfReference, PdfObject*> mappedObjects;
     auto& newObj = copyPageObject(m_Objects, doc.GetPages().GetPageAt(pageIndex).GetObject(), mappedObjects);
     m_Pages->InsertPageAt(atIndex, unique_ptr<PdfPage>(new PdfPage(newObj)));
 
     // TODO: merge name trees
 }
 
-void PdfDocument::AppendDocumentPages(const PdfDocument& doc, unsigned pageIndex, unsigned pageCount)
+void PdfDocument::AppendDocumentPages(const PdfDocument& doc, unsigned pageIndex, unsigned pageCount,
+    unordered_map<PdfReference, PdfObject*>& mappedObjects)
 {
-    unordered_map<PdfReference, PdfObject*> mappedObjects;
     for (unsigned i = 0; i < pageCount; i++)
     {
         auto& newObj = copyPageObject(m_Objects, doc.GetPages().GetPageAt(pageIndex + i).GetObject(), mappedObjects);
@@ -231,14 +234,13 @@ void PdfDocument::lazyLoadInfo()
     auto infoObj = m_TrailerObj->GetDictionary().FindKey("Info");
     if (infoObj != nullptr)
     {
-        try
+        if (!PdfInfo::TryCreateFromObject(*infoObj, m_Info))
         {
-            m_Info = unique_ptr<PdfInfo>(new PdfInfo(*infoObj));
-        }
-        catch (PdfError& ex)
-        {
+            if (m_IsStrictParsing)
+                PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidDataType, "Failed to load /Info dictionary: invalid object type");
+
             PoDoFo::LogMessage(PdfLogSeverity::Warning,
-                "Failed to load /Info dictionary: {}", ex.what());
+                "Failed to load /Info dictionary: invalid object type");
         }
     }
 
@@ -269,7 +271,8 @@ void PdfDocument::createAction(PdfActionType type, unique_ptr<PdfAction>& action
     action = PdfAction::Create(*this, type);
 }
 
-Rect PdfDocument::FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page, bool useTrimBox)
+Rect PdfDocument::FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page, PdfFillFormFlags flags,
+    unordered_map<PdfReference, PdfObject*>* mappedObjects)
 {
     Rect box = page.GetMediaBox();
 
@@ -277,7 +280,7 @@ Rect PdfDocument::FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page,
     box.Intersect(page.GetCropBox());
 
     // Intersect with trim-box according to parameter
-    if (useTrimBox)
+    if ((flags & PdfFillFormFlags::UseTrimBox) != PdfFillFormFlags::None)
         box.Intersect(page.GetTrimBox());
 
     auto& sourceDoc = page.GetDocument();
@@ -298,14 +301,20 @@ Rect PdfDocument::FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page,
     }
     else
     {
-        // Cross-document: selectively copy referenced objects
-        unordered_map<PdfReference, PdfObject*> mappedObjects;
+        unique_ptr<unordered_map<PdfReference, PdfObject*>> temp;
+        if (mappedObjects == nullptr)
+        {
+            // If a map is not supplied create one now
+            temp.reset(new unordered_map<PdfReference, PdfObject*>());
+            mappedObjects = temp.get();
+        }
 
+        // Cross-document: selectively copy referenced objects
         auto* resourcesObj = page.GetDictionary().FindKeyParent("Resources");
         if (resourcesObj != nullptr)
         {
             PdfObject resourcesCopy(*resourcesObj);
-            copyReferencedObjects(resourcesCopy, sourceDoc.GetObjects(), m_Objects, mappedObjects);
+            copyReferencedObjects(resourcesCopy, sourceDoc.GetObjects(), m_Objects, *mappedObjects);
             xobj.GetDictionary().AddKey("Resources"_n, std::move(resourcesCopy));
         }
 
@@ -315,7 +324,7 @@ Rect PdfDocument::FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page,
         if (groupObj != nullptr)
         {
             PdfObject groupCopy(*groupObj);
-            copyReferencedObjects(groupCopy, sourceDoc.GetObjects(), m_Objects, mappedObjects);
+            copyReferencedObjects(groupCopy, sourceDoc.GetObjects(), m_Objects, *mappedObjects);
             xobj.GetDictionary().AddKey("Group"_n, std::move(groupCopy));
         }
     }
@@ -327,9 +336,9 @@ Rect PdfDocument::FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page,
     return box;
 }
 
-void PdfDocument::CollectGarbage()
+void PdfDocument::CollectGarbage(PdfGarbageCollectionFlags flags)
 {
-    m_Objects.CollectGarbage();
+    m_Objects.CollectGarbage(flags);
 }
 
 PdfOutlines& PdfDocument::GetOrCreateOutlines()
@@ -380,6 +389,11 @@ void PdfDocument::SetTrailer(unique_ptr<PdfObject> obj)
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::ObjectNotFound, "Catalog object not found!");
 
     m_Catalog.reset(new PdfCatalog(*catalog));
+}
+
+void PdfDocument::SetStrictParsing(bool value)
+{
+    m_IsStrictParsing = value;
 }
 
 bool PdfDocument::IsEncrypted() const
@@ -706,19 +720,29 @@ static void copyReferencedObjects(PdfObject& obj, const PdfIndirectObjectList& s
             if (pair.second.TryGetReference(srcRef))
             {
                 auto it = mappedObjects.find(srcRef);
-                if (it != mappedObjects.end())
-                {
-                    pair.second = PdfObject(it->second->GetIndirectReference());
-                }
-                else
+                if (it == mappedObjects.end())
                 {
                     auto* srcChild = src.GetObject(srcRef);
-                    if (srcChild != nullptr)
+                    if (srcChild == nullptr)
+                    {
+                        // Unconditionally reset the reference to
+                        // a null "0 0 R" reference. This is helpful
+                        // to prevent silent corruptions of the document
+                        // in case a reference is pointing to a unexisting
+                        // object and a new object with the same reference
+                        // is added later by other means
+                        pair.second.SetReference(PdfReference());
+                    }
+                    else
                     {
                         auto& copied = copyIndirectObject(dest, *srcChild, mappedObjects);
                         pair.second = PdfObject(copied.GetIndirectReference());
                         copyReferencedObjects(copied, src, dest, mappedObjects);
                     }
+                }
+                else
+                {
+                    pair.second = PdfObject(it->second->GetIndirectReference());
                 }
             }
             else if (pair.second.IsDictionary() || pair.second.IsArray())
@@ -734,19 +758,29 @@ static void copyReferencedObjects(PdfObject& obj, const PdfIndirectObjectList& s
             if (child.TryGetReference(srcRef))
             {
                 auto it = mappedObjects.find(srcRef);
-                if (it != mappedObjects.end())
-                {
-                    child = PdfObject(it->second->GetIndirectReference());
-                }
-                else
+                if (it == mappedObjects.end())
                 {
                     auto* srcChild = src.GetObject(srcRef);
-                    if (srcChild != nullptr)
+                    if (srcChild == nullptr)
+                    {
+                        // Unconditionally reset the reference to
+                        // a null "0 0 R" reference. This is helpful
+                        // to prevent silent corruptions of the document
+                        // in case a reference is pointing to a unexisting
+                        // object and a new object with the same reference
+                        // is added later by other means
+                        child.SetReference(PdfReference());
+                    }
+                    else
                     {
                         auto& copied = copyIndirectObject(dest, *srcChild, mappedObjects);
                         child = PdfObject(copied.GetIndirectReference());
                         copyReferencedObjects(copied, src, dest, mappedObjects);
                     }
+                }
+                else
+                {
+                    child = PdfObject(it->second->GetIndirectReference());
                 }
             }
             else if (child.IsDictionary() || child.IsArray())

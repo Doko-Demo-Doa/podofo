@@ -273,7 +273,11 @@ private:
 
     PdfVariant(PdfArray* arr);
 
-    PdfReference GetReferenceUnsafe() const;
+    const PdfReference& GetReferenceUnsafe() const
+    {
+        return m_Reference;
+    }
+
     const PdfDictionary& GetDictionaryUnsafe() const;
     const PdfArray& GetArrayUnsafe() const;
     PdfDictionary& GetDictionaryUnsafe();
@@ -288,7 +292,7 @@ private:
     void moveFrom(PdfVariant&& rhs);
 
 private:
-    // Reset the variant to "null" type. To be called by PdfTokenizer
+    /// Reset the variant to "null" type. To be called by PdfTokenizer
     void Reset();
 
     /// It's an easy mistake to pass a pointer to a PdfVariant when trying to

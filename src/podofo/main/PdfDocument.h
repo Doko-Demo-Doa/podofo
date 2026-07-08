@@ -139,7 +139,7 @@ public:
     /// @returns PdfObject the AcroForm dictionary
     PdfAcroForm& GetOrCreateAcroForm(PdfAcroFormDefaulAppearance eDefaultAppearance = PdfAcroFormDefaulAppearance::ArialBlack);
 
-    void CollectGarbage();
+    void CollectGarbage(PdfGarbageCollectionFlags flags = PdfGarbageCollectionFlags::None);
 
     /// Construct a new PdfImage object
     std::unique_ptr<PdfImage> CreateImage();
@@ -290,6 +290,8 @@ public:
     bool IsEncrypted() const;
 
 public:
+    bool IsStrictParsing() const { return m_IsStrictParsing; }
+
     /// Get access to the internal Catalog dictionary
     /// or root object.
     ///
@@ -367,6 +369,8 @@ protected:
     ///         It will be owned by PdfDocument.
     void SetTrailer(std::unique_ptr<PdfObject> obj);
 
+    void SetStrictParsing(bool value);
+
     /// Internal method for initializing the pages tree for this document
     void Init();
 
@@ -394,11 +398,11 @@ private:
 
     // Called by PdfPageCollection
     void AppendDocumentPages(const PdfDocument& doc);
-    void InsertDocumentPageAt(unsigned atIndex, const PdfDocument& doc, unsigned pageIndex);
-    void AppendDocumentPages(const PdfDocument& doc, unsigned pageIndex, unsigned pageCount);
+    void InsertDocumentPageAt(unsigned atIndex, const PdfDocument& doc, unsigned pageIndex, std::unordered_map<PdfReference, PdfObject*>& map);
+    void AppendDocumentPages(const PdfDocument& doc, unsigned pageIndex, unsigned pageCount, std::unordered_map<PdfReference, PdfObject*>& map);
 
     // Called by PdfXObjectForm
-    Rect FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page, bool useTrimBox);
+    Rect FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page, PdfFillFormFlags flags, std::unordered_map<PdfReference, PdfObject*>* map);
 
     PdfInfo& GetOrCreateInfo();
 
@@ -422,6 +426,7 @@ private:
     PdfIndirectObjectList m_Objects;
     PdfMetadata m_Metadata;
     PdfFontManager m_FontManager;
+    bool m_IsStrictParsing;
     bool m_InfoLazyLoaded;
     bool m_OutlinesLazyLoaded;
     std::unique_ptr<PdfObject> m_TrailerObj;
