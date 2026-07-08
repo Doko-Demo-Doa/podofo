@@ -80,6 +80,7 @@
 #include "main/PdfComboBox.h"
 #include "main/PdfListBox.h"
 #include "main/PdfSignature.h"
+#include "main/PdfSignatureContents.h"
 #include "main/PdfFileSpec.h"
 #include "main/PdfFontManager.h"
 #include "main/PdfFontCIDTrueType.h"

@@ -12,6 +12,7 @@
 #include "PdfDocument.h"
 #include "PdfDictionary.h"
 #include "PdfData.h"
+#include "PdfSignatureContents.h"
 
 #include "PdfXObject.h"
 #include "PdfPage.h"
@@ -233,6 +234,129 @@ nullable<PdfDate> PdfSignature::GetSignatureDate() const
     }
 
     return date;
+}
+
+bool PdfSignature::HasSignatureValue() const
+{
+    if (m_ValueObj == nullptr)
+        return false;
+
+    return m_ValueObj->GetDictionary().FindKey("Contents") != nullptr;
+}
+
+nullable<const PdfName&> PdfSignature::GetFilter() const
+{
+    return getNameFromValueDict("Filter");
+}
+
+nullable<const PdfName&> PdfSignature::GetSubFilter() const
+{
+    return getNameFromValueDict("SubFilter");
+}
+
+nullable<const PdfName&> PdfSignature::GetType() const
+{
+    return getNameFromValueDict("Type");
+}
+
+nullable<const PdfString&> PdfSignature::GetContactInfo() const
+{
+    return getStringFromValueDict("ContactInfo");
+}
+
+nullable<const PdfArray&> PdfSignature::GetByteRange() const
+{
+    return getArrayFromValueDict("ByteRange");
+}
+
+nullable<const PdfDictionary&> PdfSignature::GetPropBuild() const
+{
+    return getDictionaryFromValueDict("Prop_Build");
+}
+
+bool PdfSignature::TryGetContents(charbuff& contents) const
+{
+    if (m_ValueObj == nullptr)
+        return false;
+
+    auto obj = m_ValueObj->GetDictionary().FindKey("Contents");
+    if (obj == nullptr)
+        return false;
+
+    // Existing signed PDFs store /Contents as a hex string.
+    // If the string has already been evaluated as text, the raw bytes are no
+    // longer directly accessible.
+    const PdfString* str;
+    if (!obj->TryGetString(str) || !str->IsHex() || str->IsStringEvaluated())
+        return false;
+
+    auto rawData = str->GetRawData();
+    contents.assign(rawData.data(), rawData.size());
+    return true;
+}
+
+bool PdfSignature::TryGetSignatureContents(PdfSignatureContents& contents) const
+{
+    charbuff raw;
+    if (!TryGetContents(raw))
+        return false;
+
+    // Attempt the parse regardless of outcome: the caller can inspect
+    // contents.IsValid() to tell a malformed CMS blob from a well-formed one
+    (void)contents.TryParse(raw);
+    return true;
+}
+
+nullable<const PdfName&> PdfSignature::getNameFromValueDict(const string_view& key) const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    const PdfName* name;
+    auto obj = m_ValueObj->GetDictionary().FindKey(key);
+    if (obj == nullptr || !obj->TryGetName(name))
+        return nullptr;
+
+    return *name;
+}
+
+nullable<const PdfString&> PdfSignature::getStringFromValueDict(const string_view& key) const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    const PdfString* str;
+    auto obj = m_ValueObj->GetDictionary().FindKey(key);
+    if (obj == nullptr || !obj->TryGetString(str))
+        return nullptr;
+
+    return *str;
+}
+
+nullable<const PdfArray&> PdfSignature::getArrayFromValueDict(const string_view& key) const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    const PdfArray* arr;
+    auto obj = m_ValueObj->GetDictionary().FindKey(key);
+    if (obj == nullptr || !obj->TryGetArray(arr))
+        return nullptr;
+
+    return *arr;
+}
+
+nullable<const PdfDictionary&> PdfSignature::getDictionaryFromValueDict(const string_view& key) const
+{
+    if (m_ValueObj == nullptr)
+        return nullptr;
+
+    const PdfDictionary* dict;
+    auto obj = m_ValueObj->GetDictionary().FindKey(key);
+    if (obj == nullptr || !obj->TryGetDictionary(dict))
+        return nullptr;
+
+    return *dict;
 }
 
 bool PdfSignature::TryGetPreviousRevision(InputStreamDevice& input, OutputStreamDevice& output) const

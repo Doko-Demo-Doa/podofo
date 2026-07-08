@@ -18,6 +18,7 @@
 namespace PoDoFo {
 
 class PdfAcroForm;
+class PdfSignatureContents;
 
 enum class PdfCertPermission : uint8_t
 {
@@ -94,10 +95,54 @@ public:
     /// @returns the found location object
     nullable<const PdfString&> GetSignatureLocation() const;
 
+    /// Get the contact info of the signature
+    ///
+    /// @returns the found contact info object
+    nullable<const PdfString&> GetContactInfo() const;
+
     /// Get the date of the signature
     ///
     /// @returns the found date object
     nullable<PdfDate> GetSignatureDate() const;
+
+    /// Get the signature handler filter (e.g. Adobe.PPKLite)
+    nullable<const PdfName&> GetFilter() const;
+
+    /// Get the signature sub-filter (e.g. ETSI.CAdES.detached)
+    nullable<const PdfName&> GetSubFilter() const;
+
+    /// Get the signature type name (e.g. Sig or DocTimeStamp)
+    nullable<const PdfName&> GetType() const;
+
+    /// Get the byte range array
+    nullable<const PdfArray&> GetByteRange() const;
+
+    /// Get the Prop_Build dictionary describing the signing application
+    nullable<const PdfDictionary&> GetPropBuild() const;
+
+    /// Decode the raw /Contents bytes.
+    /// Existing signed PDFs store /Contents as a hex string, which is the
+    /// common case handled here.
+    ///
+    /// NOTE: the underlying PdfString caches its decoded text form the first
+    /// time it is evaluated (eg. by some other code calling GetString() on the
+    /// same object), and once that happens the original raw bytes are gone for
+    /// good. Call this before anything else evaluates the /Contents object, or
+    /// this will permanently return false.
+    ///
+    /// @param contents output buffer that will hold the raw signature bytes
+    /// @returns true if the contents could be decoded
+    bool TryGetContents(charbuff& contents) const;
+
+    /// Convenience: decode /Contents and parse the CMS/PKCS7 blob.
+    /// @param contents output object that will receive the parsed signer info
+    /// @returns true if /Contents was present and could be decoded. Callers
+    /// should still check contents.IsValid(), since the decoded bytes may not
+    /// be a well-formed CMS/PKCS7 message
+    bool TryGetSignatureContents(PdfSignatureContents& contents) const;
+
+    /// Returns true if the field has a signature value object with /Contents set
+    bool HasSignatureValue() const;
 
     /// Ensures that the signature field has set a signature object.
     /// The function does nothing, if the signature object is already
@@ -138,6 +183,11 @@ private:
     void SetContentsByteRangeNoDirtySet(const bufferview& contents, PdfArray&& byteRange);
 
     void ensureValueObject();
+
+    nullable<const PdfName&> getNameFromValueDict(const std::string_view& key) const;
+    nullable<const PdfString&> getStringFromValueDict(const std::string_view& key) const;
+    nullable<const PdfArray&> getArrayFromValueDict(const std::string_view& key) const;
+    nullable<const PdfDictionary&> getDictionaryFromValueDict(const std::string_view& key) const;
 private:
     void init(PdfAcroForm& acroForm);
 

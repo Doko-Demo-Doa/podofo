@@ -503,3 +503,198 @@ TEST_CASE("TestSignatureCorrupted")
         throw;
     }
 }
+
+TEST_CASE("TestSignatureInfoDictionary")
+{
+    charbuff currBuffer;
+    utls::ReadTo(currBuffer, TestUtils::GetTestInputFilePath("TestBlankSigned.pdf"));
+    auto input = std::make_shared<BufferStreamDevice>(currBuffer);
+
+    PdfMemDocument doc;
+    doc.Load(input);
+    auto& signature = dynamic_cast<PdfSignature&>(
+        dynamic_cast<PdfAnnotationWidget&>(
+            doc.GetPages().GetPageAt(0).GetAnnotations().GetAnnotAt(0)).GetField());
+
+    REQUIRE(signature.HasSignatureValue());
+
+    auto filter = signature.GetFilter();
+    REQUIRE(filter.has_value());
+    REQUIRE(filter->GetString() == "Adobe.PPKLite");
+
+    auto subFilter = signature.GetSubFilter();
+    REQUIRE(subFilter.has_value());
+    REQUIRE(subFilter->GetString() == "ETSI.CAdES.detached");
+
+    auto type = signature.GetType();
+    REQUIRE(type.has_value());
+    REQUIRE(type->GetString() == "Sig");
+
+    auto byteRange = signature.GetByteRange();
+    REQUIRE(byteRange.has_value());
+    REQUIRE(byteRange->GetSize() == 4);
+
+    charbuff contents;
+    REQUIRE(signature.TryGetContents(contents));
+    REQUIRE(!contents.empty());
+}
+
+TEST_CASE("TestSignatureInfoContents")
+{
+    charbuff currBuffer;
+    utls::ReadTo(currBuffer, TestUtils::GetTestInputFilePath("TestBlankSigned.pdf"));
+    auto input = std::make_shared<BufferStreamDevice>(currBuffer);
+
+    PdfMemDocument doc;
+    doc.Load(input);
+    auto& signature = dynamic_cast<PdfSignature&>(
+        dynamic_cast<PdfAnnotationWidget&>(
+            doc.GetPages().GetPageAt(0).GetAnnotations().GetAnnotAt(0)).GetField());
+
+    charbuff contents;
+    REQUIRE(signature.TryGetContents(contents));
+
+    PdfSignatureContents sigContents(contents);
+    REQUIRE(sigContents.IsValid());
+
+    auto& signerInfos = sigContents.GetSignerInfos();
+    REQUIRE(!signerInfos.empty());
+
+    auto& signerInfo = signerInfos[0];
+    REQUIRE(!signerInfo.Subject.empty());
+    REQUIRE(!signerInfo.Issuer.empty());
+    REQUIRE(!signerInfo.Serial.empty());
+    REQUIRE(!signerInfo.Certificate.empty());
+    // PAdES-B signatures in PoDoFo intentionally omit the CMS signingTime
+    // attribute and rely on /M in the PDF dictionary instead.
+}
+
+TEST_CASE("TestSignatureInfoFreshSign")
+{
+    charbuff currBuffer;
+    auto inputPath = TestUtils::GetTestInputFilePath("TestSignature.pdf");
+    utls::ReadTo(currBuffer, inputPath);
+    auto inputOutput = std::make_shared<BufferStreamDevice>(currBuffer);
+
+    string cert;
+    TestUtils::ReadTestInputFile("mycert.der", cert);
+
+    string pkey;
+    TestUtils::ReadTestInputFile("mykey-pkcs8.der", pkey);
+
+    PdfMemDocument doc(inputOutput);
+    auto& page = doc.GetPages().GetPageAt(0);
+    auto& annot = page.GetAnnotations().GetAnnotAt(0);
+    auto& field = dynamic_cast<PdfAnnotationWidget&>(annot).GetField();
+    auto& signature = dynamic_cast<PdfSignature&>(field);
+
+    auto date = PdfDate::ParseW3C("2024-07-31T17:03:42+02:00");
+    signature.SetSignatureDate(date);
+
+    auto signer = PdfSignerCms(cert, pkey);
+    PoDoFo::SignDocument(doc, *inputOutput, signer, signature, PdfSaveOptions::NoMetadataUpdate);
+
+    // Reload and inspect the signature
+    doc.Load(inputOutput);
+    auto& signature2 = dynamic_cast<PdfSignature&>(
+        dynamic_cast<PdfAnnotationWidget&>(
+            doc.GetPages().GetPageAt(0).GetAnnotations().GetAnnotAt(0)).GetField());
+
+    REQUIRE(signature2.HasSignatureValue());
+
+    auto filter = signature2.GetFilter();
+    REQUIRE(filter.has_value());
+    REQUIRE(filter->GetString() == "Adobe.PPKLite");
+
+    auto subFilter = signature2.GetSubFilter();
+    REQUIRE(subFilter.has_value());
+    REQUIRE(subFilter->GetString() == "ETSI.CAdES.detached");
+
+    auto type = signature2.GetType();
+    REQUIRE(type.has_value());
+    REQUIRE(type->GetString() == "Sig");
+
+    auto sigDate = signature2.GetSignatureDate();
+    REQUIRE(sigDate.has_value());
+    REQUIRE(*sigDate == date);
+
+    charbuff contents;
+    REQUIRE(signature2.TryGetContents(contents));
+
+    PdfSignatureContents sigContents(contents);
+    REQUIRE(sigContents.IsValid());
+
+    auto& signerInfos = sigContents.GetSignerInfos();
+    REQUIRE(!signerInfos.empty());
+
+    auto& signerInfo = signerInfos[0];
+    REQUIRE(!signerInfo.Subject.empty());
+    REQUIRE(!signerInfo.Certificate.empty());
+    // PAdES-B signatures in PoDoFo intentionally omit the CMS signingTime
+    // attribute and rely on /M in the PDF dictionary instead.
+}
+
+TEST_CASE("TestSignatureInfoPkcs7SigningTime")
+{
+    charbuff currBuffer;
+    auto inputPath = TestUtils::GetTestInputFilePath("TestSignature.pdf");
+    utls::ReadTo(currBuffer, inputPath);
+    auto inputOutput = std::make_shared<BufferStreamDevice>(currBuffer);
+
+    string cert;
+    TestUtils::ReadTestInputFile("mycert.der", cert);
+
+    string pkey;
+    TestUtils::ReadTestInputFile("mykey-pkcs8.der", pkey);
+
+    PdfMemDocument doc(inputOutput);
+    auto& page = doc.GetPages().GetPageAt(0);
+    auto& annot = page.GetAnnotations().GetAnnotAt(0);
+    auto& field = dynamic_cast<PdfAnnotationWidget&>(annot).GetField();
+    auto& signature = dynamic_cast<PdfSignature&>(field);
+
+    PdfSignerCmsParams params;
+    params.SignatureType = PdfSignatureType::Pkcs7;
+    auto signer = PdfSignerCms(cert, pkey, params);
+    PoDoFo::SignDocument(doc, *inputOutput, signer, signature, PdfSaveOptions::NoMetadataUpdate);
+
+    // Reload and inspect the signature
+    doc.Load(inputOutput);
+    auto& signature2 = dynamic_cast<PdfSignature&>(
+        dynamic_cast<PdfAnnotationWidget&>(
+            doc.GetPages().GetPageAt(0).GetAnnotations().GetAnnotAt(0)).GetField());
+
+    auto subFilter = signature2.GetSubFilter();
+    REQUIRE(subFilter.has_value());
+    REQUIRE(subFilter->GetString() == "adbe.pkcs7.detached");
+
+    charbuff contents;
+    REQUIRE(signature2.TryGetContents(contents));
+
+    PdfSignatureContents sigContents(contents);
+    REQUIRE(sigContents.IsValid());
+
+    auto& signerInfos = sigContents.GetSignerInfos();
+    REQUIRE(!signerInfos.empty());
+
+    auto& signerInfo = signerInfos[0];
+    REQUIRE(!signerInfo.Subject.empty());
+    REQUIRE(!signerInfo.Certificate.empty());
+    REQUIRE(signerInfo.SigningTime.has_value());
+}
+
+TEST_CASE("TestSignatureEmptyField")
+{
+    PdfMemDocument doc;
+    auto& page = doc.GetPages().CreatePage(PdfPageSize::A4);
+    auto& signature = page.CreateField<PdfSignature>("Signature", Rect());
+
+    REQUIRE(!signature.HasSignatureValue());
+    REQUIRE(!signature.GetFilter().has_value());
+    REQUIRE(!signature.GetSubFilter().has_value());
+    REQUIRE(!signature.GetType().has_value());
+    REQUIRE(!signature.GetByteRange().has_value());
+
+    charbuff contents;
+    REQUIRE(!signature.TryGetContents(contents));
+}
