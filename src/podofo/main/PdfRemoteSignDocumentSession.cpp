@@ -798,6 +798,19 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::getOCSPFromCertificate(const s
 }
 
 std::string PoDoFo::PdfRemoteSignDocumentSession::buildOCSPRequestFromCertificates(const std::string& base64Cert, const std::string& base64IssuerCert) {
+#ifdef OPENSSL_NO_OCSP
+    // Some vendored OpenSSL builds this fork links against on certain
+    // platforms (eg. the prebuilt package extern/deps supplies for the
+    // playground/ build used by build-win.yml) are compiled with OCSP
+    // support entirely disabled. Degrade to a clear runtime error there
+    // instead of failing to build at all -- every other OCSP-adjacent
+    // helper in this class only needs X509/generic ASN.1 APIs (unaffected
+    // by this flag); only the real OCSP_REQUEST/OCSP_CERTID protocol
+    // types used below require it.
+    (void)base64Cert;
+    (void)base64IssuerCert;
+    throw std::runtime_error("OCSP request building is not supported: this build's OpenSSL was compiled with OCSP support disabled (OPENSSL_NO_OCSP).");
+#else
     std::vector<unsigned char> decoded_cert = ConvertBase64PEMtoDER(std::optional<std::string>(base64Cert), std::nullopt);
     std::vector<unsigned char> decoded_issuer = ConvertBase64PEMtoDER(std::optional<std::string>(base64IssuerCert), std::nullopt);
 
@@ -828,6 +841,7 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::buildOCSPRequestFromCertificat
     PoDoFo::charbuff req_charbuff;
     req_charbuff.assign(reinterpret_cast<const char*>(req_data.data()), req_data.size());
     return ToBase64(req_charbuff);
+#endif
 }
 
 std::string PoDoFo::PdfRemoteSignDocumentSession::getCertificateIssuerUrlFromCertificate(const std::string& base64Cert) {
