@@ -180,6 +180,20 @@ static bool tryGetStandard14FontType(NSString *name, PdfStandard14FontType &font
     }
 }
 
+- (nullable PoDoFoFont *)fontFromBuffer:(NSData *)data error:(NSError **)error
+{
+    if (![self checkOpen:error])
+        return nil;
+    try {
+        bufferview buffer(reinterpret_cast<const char *>(data.bytes), (size_t)data.length);
+        auto &font = _doc->GetFonts().GetOrCreateFontFromBuffer(buffer);
+        return [[PoDoFoFont alloc] initWithFont:font document:self];
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return nil;
+    }
+}
+
 - (nullable PoDoFoImage *)imageFromBuffer:(NSData *)data error:(NSError **)error
 {
     if (![self checkOpen:error])

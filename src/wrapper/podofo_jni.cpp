@@ -896,6 +896,35 @@ extern "C" {
         }
     }
 
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetOrCreateFontFromBuffer(
+        JNIEnv* env, jobject thiz, jlong handle, jbyteArray jData) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            jsize length = env->GetArrayLength(jData);
+            jbyte* bytes = env->GetByteArrayElements(jData, nullptr);
+            if (bytes == nullptr) {
+                throwJavaException(env, "Failed to access font data");
+                return 0;
+            }
+
+            PoDoFo::PdfFont* font = nullptr;
+            try {
+                PoDoFo::bufferview buffer(reinterpret_cast<const char*>(bytes), static_cast<size_t>(length));
+                font = &doc->GetFonts().GetOrCreateFontFromBuffer(buffer);
+            } catch (...) {
+                env->ReleaseByteArrayElements(jData, bytes, JNI_ABORT);
+                throw;
+            }
+            env->ReleaseByteArrayElements(jData, bytes, JNI_ABORT);
+
+            return reinterpret_cast<jlong>(font);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
     JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreateImageFromBuffer(
         JNIEnv* env, jobject thiz, jlong handle, jbyteArray jData) {
 

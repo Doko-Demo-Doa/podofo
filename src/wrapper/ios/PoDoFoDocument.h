@@ -73,6 +73,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// font search available (needs Fontconfig, unavailable in this build).
 - (nullable PoDoFoFont *)fontFromFile:(NSString *)fontFilePath error:(NSError **)error;
 
+/// Loads a font (TTF/OTF) already in memory — the counterpart to
+/// -fontFromFile:error: for fonts bundled as app resources (eg. an asset
+/// in the app bundle) that would otherwise need to be copied out to a
+/// temporary file first just to get a filesystem path.
+- (nullable PoDoFoFont *)fontFromBuffer:(NSData *)data error:(NSError **)error;
+
 /// Decodes an encoded image (JPEG/PNG/etc.) from a buffer and embeds it in
 /// the document, ready to draw via -[PoDoFoPainter drawImage:atX:y:].
 - (nullable PoDoFoImage *)imageFromBuffer:(NSData *)data error:(NSError **)error;

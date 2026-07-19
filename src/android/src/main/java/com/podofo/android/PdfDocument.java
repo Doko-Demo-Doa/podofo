@@ -184,6 +184,27 @@ public class PdfDocument implements AutoCloseable {
   }
 
   /**
+   * Loads a font (TTF/OTF) already in memory — the counterpart to
+   * {@link #getOrCreateFont(String)} for fonts bundled as app resources
+   * (eg. Android {@code assets/}) that would otherwise need to be copied
+   * out to a temporary file first just to get a native-readable path.
+   *
+   * @param data the raw font file bytes
+   * @throws PoDoFoException if the font couldn't be loaded
+   */
+  public PdfFont getOrCreateFontFromBuffer(byte[] data) throws PoDoFoException {
+    checkOpen();
+    if (data == null) {
+      throw new IllegalArgumentException("data must not be null");
+    }
+    long fontHandle = nativeGetOrCreateFontFromBuffer(nativeHandle, data);
+    if (fontHandle == 0) {
+      throw new PoDoFoException("Failed to load font from buffer");
+    }
+    return new PdfFont(fontHandle);
+  }
+
+  /**
    * Decodes an encoded image (JPEG/PNG/etc.) from a buffer and embeds it
    * in the document, ready to draw via
    * {@link PdfPainter#drawImage(PdfImage, double, double)}.
@@ -397,6 +418,8 @@ public class PdfDocument implements AutoCloseable {
   private native long nativeGetOrCreateOutlines(long handle);
 
   private native long nativeGetOrCreateFont(long handle, String fontFilePath);
+
+  private native long nativeGetOrCreateFontFromBuffer(long handle, byte[] data);
 
   private native long nativeCreateImageFromBuffer(long handle, byte[] data);
 
