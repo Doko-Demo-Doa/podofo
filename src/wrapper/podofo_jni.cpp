@@ -702,6 +702,58 @@ extern "C" {
         }
     }
 
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreatePageAt(
+        JNIEnv* env, jobject thiz, jlong handle, jint index, jdouble width, jdouble height) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto& page = doc->GetPages().CreatePageAt(static_cast<unsigned>(index),
+                PoDoFo::Rect(0, 0, width, height));
+            return reinterpret_cast<jlong>(&page);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeAppendDocumentPages(
+        JNIEnv* env, jobject thiz, jlong handle, jlong sourceHandle) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* source = reinterpret_cast<PoDoFo::PdfMemDocument*>(sourceHandle);
+            doc->GetPages().AppendDocumentPages(*source);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeAppendDocumentPagesRange(
+        JNIEnv* env, jobject thiz, jlong handle, jlong sourceHandle, jint pageIndex, jint pageCount) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* source = reinterpret_cast<PoDoFo::PdfMemDocument*>(sourceHandle);
+            doc->GetPages().AppendDocumentPages(*source,
+                static_cast<unsigned>(pageIndex), static_cast<unsigned>(pageCount));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeInsertDocumentPageAt(
+        JNIEnv* env, jobject thiz, jlong handle, jint atIndex, jlong sourceHandle, jint pageIndex) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* source = reinterpret_cast<PoDoFo::PdfMemDocument*>(sourceHandle);
+            doc->GetPages().InsertDocumentPageAt(static_cast<unsigned>(atIndex),
+                *source, static_cast<unsigned>(pageIndex));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetTitle(
         JNIEnv* env, jobject thiz, jlong handle) {
 
@@ -1090,6 +1142,73 @@ extern "C" {
         } catch (const std::exception& e) {
             throwJavaException(env, e.what());
             return 0;
+        }
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfPage_nativeGetRotation(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+        return static_cast<jint>(page->GetRotation());
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPage_nativeSetRotation(
+        JNIEnv* env, jobject thiz, jlong handle, jint rotation) {
+
+        try {
+            auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+            page->SetRotation(static_cast<int>(rotation));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT jdoubleArray JNICALL Java_com_podofo_android_PdfPage_nativeGetMediaBox(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+        auto rect = page->GetMediaBox();
+        jdoubleArray result = env->NewDoubleArray(4);
+        jdouble values[4] = { rect.X, rect.Y, rect.Width, rect.Height };
+        env->SetDoubleArrayRegion(result, 0, 4, values);
+        return result;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPage_nativeSetMediaBox(
+        JNIEnv* env, jobject thiz, jlong handle, jdouble x, jdouble y, jdouble width, jdouble height) {
+
+        auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+        page->SetMediaBox(PoDoFo::Rect(x, y, width, height));
+    }
+
+    JNIEXPORT jdoubleArray JNICALL Java_com_podofo_android_PdfPage_nativeGetCropBox(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+        auto rect = page->GetCropBox();
+        jdoubleArray result = env->NewDoubleArray(4);
+        jdouble values[4] = { rect.X, rect.Y, rect.Width, rect.Height };
+        env->SetDoubleArrayRegion(result, 0, 4, values);
+        return result;
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPage_nativeSetCropBox(
+        JNIEnv* env, jobject thiz, jlong handle, jdouble x, jdouble y, jdouble width, jdouble height) {
+
+        auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+        page->SetCropBox(PoDoFo::Rect(x, y, width, height));
+    }
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfPage_nativeMoveTo(
+        JNIEnv* env, jobject thiz, jlong handle, jint newIndex) {
+
+        try {
+            auto* page = reinterpret_cast<PoDoFo::PdfPage*>(handle);
+            bool moved = page->MoveTo(static_cast<unsigned>(newIndex));
+            return moved ? JNI_TRUE : JNI_FALSE;
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return JNI_FALSE;
         }
     }
 

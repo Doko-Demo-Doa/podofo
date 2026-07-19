@@ -124,6 +124,26 @@ extern "C"
     JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeRemovePageAt(
         JNIEnv *env, jobject thiz, jlong handle, jint index);
 
+    // Creates a new page and inserts it at the given 0-based index in the
+    // document's page tree (vs. nativeCreatePage which always appends).
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeCreatePageAt(
+        JNIEnv *env, jobject thiz, jlong handle, jint index, jdouble width, jdouble height);
+
+    // Merge: append every page from another PdfMemDocument into this one.
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeAppendDocumentPages(
+        JNIEnv *env, jobject thiz, jlong handle, jlong sourceHandle);
+
+    // Merge/split: copy a contiguous range of pages from another PdfMemDocument
+    // and append them at the end of this document. Split is the same call done
+    // with an empty target document.
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeAppendDocumentPagesRange(
+        JNIEnv *env, jobject thiz, jlong handle, jlong sourceHandle, jint pageIndex, jint pageCount);
+
+    // Insert a single page from another PdfMemDocument at the given index in
+    // this document's page tree.
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeInsertDocumentPageAt(
+        JNIEnv *env, jobject thiz, jlong handle, jint atIndex, jlong sourceHandle, jint pageIndex);
+
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetTitle(
         JNIEnv *env, jobject thiz, jlong handle);
 
@@ -214,6 +234,36 @@ extern "C"
     JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfPage_nativeCreateAnnotation(
         JNIEnv *env, jobject thiz, jlong handle, jstring jAnnotationType,
         jdouble x, jdouble y, jdouble width, jdouble height);
+
+    // Page rotation: GetRotation returns the normalized 0/90/180/270 clockwise
+    // degrees stored in the page's /Rotate entry; SetRotation accepts any
+    // multiple of 90 (negative values are normalized by PoDoFo).
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfPage_nativeGetRotation(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPage_nativeSetRotation(
+        JNIEnv *env, jobject thiz, jlong handle, jint rotation);
+
+    // Page resize via the /MediaBox. GetMediaBox returns {x, y, width, height}.
+    JNIEXPORT jdoubleArray JNICALL Java_com_podofo_android_PdfPage_nativeGetMediaBox(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPage_nativeSetMediaBox(
+        JNIEnv *env, jobject thiz, jlong handle, jdouble x, jdouble y, jdouble width, jdouble height);
+
+    // /CropBox (visible page area). Same {x, y, width, height} layout as
+    // the MediaBox accessors above.
+    JNIEXPORT jdoubleArray JNICALL Java_com_podofo_android_PdfPage_nativeGetCropBox(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PdfPage_nativeSetCropBox(
+        JNIEnv *env, jobject thiz, jlong handle, jdouble x, jdouble y, jdouble width, jdouble height);
+
+    // Reorder: moves this page to a new 0-based index within its parent
+    // document's page tree. Wraps PdfPage::MoveTo, which delegates to
+    // PdfPageCollection::TryMovePageTo.
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfPage_nativeMoveTo(
+        JNIEnv *env, jobject thiz, jlong handle, jint newIndex);
 
     // PdfPainter (PoDoFo::PdfPainter) — owning: unlike PdfPage/PdfFont, the
     // painter is not owned by the document, so nativeDestroy actually deletes.

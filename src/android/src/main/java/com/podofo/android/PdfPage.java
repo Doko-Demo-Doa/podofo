@@ -104,6 +104,73 @@ public class PdfPage {
     return new PdfAnnotation(annotHandle);
   }
 
+  /**
+   * @return the page's clockwise rotation in degrees, normalized to one of
+   *         0, 90, 180, 270 (from the page's /Rotate entry)
+   */
+  public int getRotation() {
+    return nativeGetRotation(nativeHandle);
+  }
+
+  /**
+   * Sets the page's /Rotate entry.
+   *
+   * @param rotation clockwise rotation in degrees; must be a multiple of 90
+   *                 (negative values are normalized by PoDoFo)
+   * @throws PoDoFoException if rotation isn't a multiple of 90
+   */
+  public void setRotation(int rotation) throws PoDoFoException {
+    nativeSetRotation(nativeHandle, rotation);
+  }
+
+  /**
+   * @return the page's /MediaBox as {@code {x, y, width, height}} in PDF units
+   */
+  public double[] getMediaBox() {
+    return nativeGetMediaBox(nativeHandle);
+  }
+
+  /**
+   * Sets the page's /MediaBox, resizing the page.
+   *
+   * @param x      new MediaBox origin X
+   * @param y      new MediaBox origin Y
+   * @param width  new MediaBox width
+   * @param height new MediaBox height
+   */
+  public void setMediaBox(double x, double y, double width, double height) {
+    nativeSetMediaBox(nativeHandle, x, y, width, height);
+  }
+
+  /**
+   * @return the page's /CropBox (visible region) as {@code {x, y, width, height}}
+   *         in PDF units, or the /MediaBox if no /CropBox is set
+   */
+  public double[] getCropBox() {
+    return nativeGetCropBox(nativeHandle);
+  }
+
+  /**
+   * Sets the page's /CropBox (visible region).
+   */
+  public void setCropBox(double x, double y, double width, double height) {
+    nativeSetCropBox(nativeHandle, x, y, width, height);
+  }
+
+  /**
+   * Moves this page to a new 0-based index within its parent document's
+   * page tree. Any {@link PdfPage} instances obtained for other pages become
+   * invalid - their indices shift, matching
+   * {@link PdfDocument#removePageAt(int)} semantics.
+   *
+   * @return true if the page was actually moved, false if it was already at
+   *         {@code newIndex}
+   * @throws PoDoFoException if {@code newIndex} is out of range
+   */
+  public boolean moveTo(int newIndex) throws PoDoFoException {
+    return nativeMoveTo(nativeHandle, newIndex);
+  }
+
   private native double nativeGetWidth(long handle);
 
   private native double nativeGetHeight(long handle);
@@ -117,4 +184,18 @@ public class PdfPage {
   private native long nativeGetAnnotationAt(long handle, int index);
 
   private native long nativeCreateAnnotation(long handle, String annotationType, double x, double y, double width, double height);
+
+  private native int nativeGetRotation(long handle);
+
+  private native void nativeSetRotation(long handle, int rotation);
+
+  private native double[] nativeGetMediaBox(long handle);
+
+  private native void nativeSetMediaBox(long handle, double x, double y, double width, double height);
+
+  private native double[] nativeGetCropBox(long handle);
+
+  private native void nativeSetCropBox(long handle, double x, double y, double width, double height);
+
+  private native boolean nativeMoveTo(long handle, int newIndex);
 }

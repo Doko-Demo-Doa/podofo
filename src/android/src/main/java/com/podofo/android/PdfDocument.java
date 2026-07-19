@@ -121,7 +121,7 @@ public class PdfDocument implements AutoCloseable {
 
   /**
    * Removes the page at the given 0-based index. Any {@link PdfPage}
-   * instances already obtained for later pages become invalid — matches
+   * instances already obtained for later pages become invalid - matches
    * PoDoFo's own C++ semantics (indices shift after removal).
    *
    * @throws PoDoFoException if index is out of range
@@ -129,6 +129,80 @@ public class PdfDocument implements AutoCloseable {
   public void removePageAt(int index) throws PoDoFoException {
     checkOpen();
     nativeRemovePageAt(nativeHandle, index);
+  }
+
+  /**
+   * Creates a new page and inserts it at the given 0-based index. Pages
+   * at or after {@code index} shift forward by one. The companion to
+   * {@link #createPage(double, double)} (which always appends) and
+   * {@link #removePageAt(int)} - together these cover page reordering when
+   * combined with {@link PdfPage#moveTo(int)}.
+   *
+   * @throws PoDoFoException if index is out of range or the page couldn't
+   *                         be created
+   */
+  public PdfPage createPageAt(int index, double width, double height) throws PoDoFoException {
+    checkOpen();
+    long pageHandle = nativeCreatePageAt(nativeHandle, index, width, height);
+    if (pageHandle == 0) {
+      throw new PoDoFoException("Failed to create page at index " + index);
+    }
+    return new PdfPage(pageHandle);
+  }
+
+  /**
+   * Appends every page from {@code source} to the end of this document.
+   * The standard merge primitive: load several {@link PdfDocument}s and
+   * call this for each one to concatenate them.
+   *
+   * @throws PoDoFoException if the page copy fails (eg. corrupt source)
+   */
+  public void appendPagesFrom(PdfDocument source) throws PoDoFoException {
+    checkOpen();
+    if (source == null) {
+      throw new IllegalArgumentException("source must not be null");
+    }
+    source.checkOpen();
+    nativeAppendDocumentPages(nativeHandle, source.nativeHandle);
+  }
+
+  /**
+   * Appends a contiguous range of pages from {@code source} to the end of
+   * this document. This is also the split primitive: create an empty
+   * {@link PdfDocument#createNew()}, then call this with the desired
+   * {@code pageIndex}/{@code pageCount} from a source document, then
+   * {@link #save(String)} the result - the source document isn't modified.
+   *
+   * @param source    the document to copy pages from
+   * @param pageIndex 0-based index of the first page in {@code source} to copy
+   * @param pageCount number of pages to copy
+   * @throws PoDoFoException if the range is out of bounds or the copy fails
+   */
+  public void appendPagesFrom(PdfDocument source, int pageIndex, int pageCount) throws PoDoFoException {
+    checkOpen();
+    if (source == null) {
+      throw new IllegalArgumentException("source must not be null");
+    }
+    source.checkOpen();
+    nativeAppendDocumentPagesRange(nativeHandle, source.nativeHandle, pageIndex, pageCount);
+  }
+
+  /**
+   * Inserts a single page from {@code source} at the given 0-based index in
+   * this document. Pages at or after {@code atIndex} shift forward by one.
+   *
+   * @param atIndex   insertion point in this document
+   * @param source    the document to copy a page from
+   * @param pageIndex 0-based index of the page in {@code source} to copy
+   * @throws PoDoFoException if either index is out of bounds or the copy fails
+   */
+  public void insertPageFrom(int atIndex, PdfDocument source, int pageIndex) throws PoDoFoException {
+    checkOpen();
+    if (source == null) {
+      throw new IllegalArgumentException("source must not be null");
+    }
+    source.checkOpen();
+    nativeInsertDocumentPageAt(nativeHandle, atIndex, source.nativeHandle, pageIndex);
   }
 
   /**
@@ -406,6 +480,14 @@ public class PdfDocument implements AutoCloseable {
   private native long nativeCreatePage(long handle, double width, double height);
 
   private native void nativeRemovePageAt(long handle, int index);
+
+  private native long nativeCreatePageAt(long handle, int index, double width, double height);
+
+  private native void nativeAppendDocumentPages(long handle, long sourceHandle);
+
+  private native void nativeAppendDocumentPagesRange(long handle, long sourceHandle, int pageIndex, int pageCount);
+
+  private native void nativeInsertDocumentPageAt(long handle, int atIndex, long sourceHandle, int pageIndex);
 
   private native long nativeGetStandard14Font(long handle, String name);
 
