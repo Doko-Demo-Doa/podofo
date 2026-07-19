@@ -41,8 +41,10 @@ public class PoDoFoWrapper implements AutoCloseable {
    * @param hashAlgorithm     The hash algorithm to use
    * @param inputPath         Path to the input PDF file
    * @param outputPath        Path to save the signed PDF file
-   * @param certificate       The signing certificate in PEM format
-   * @param chainCertificates Array of chain certificates in PEM format
+   * @param certificate       The signing certificate, base64-encoded DER (not PEM: no
+   *                          "-----BEGIN/END-----" header/footer, no line wrapping)
+   * @param chainCertificates Array of chain certificates, each base64-encoded DER (same
+   *                          format as {@code certificate})
    * @throws IllegalArgumentException if any of the required parameters are null
    * @throws PoDoFoException          if native initialization fails
    */
