@@ -173,6 +173,11 @@ extern "C"
     JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetOrCreateFont(
         JNIEnv *env, jobject thiz, jlong handle, jstring jFontFilePath);
 
+    // Same as nativeGetOrCreateFont, but for a font already in memory (eg. copied
+    // out of Android assets/) rather than one readable via a native file path.
+    JNIEXPORT jlong JNICALL Java_com_podofo_android_PdfDocument_nativeGetOrCreateFontFromBuffer(
+        JNIEnv *env, jobject thiz, jlong handle, jbyteArray jData);
+
     // Returns an owning handle (see PdfImage.java) — PdfDocument::CreateImage()
     // returns a unique_ptr the caller must keep alive, unlike PdfPage/PdfField/
     // PdfAnnotation which are owned by an existing document-internal collection.
