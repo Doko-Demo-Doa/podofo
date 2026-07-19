@@ -1,4 +1,7 @@
-# PoDoFo [![build-linux](https://github.com/podofo/podofo/actions/workflows/build-linux.yml/badge.svg)](https://github.com/podofo/podofo/actions/workflows/build-linux.yml) [![build-mac](https://github.com/podofo/podofo/actions/workflows/build-mac.yml/badge.svg)](https://github.com/podofo/podofo/actions/workflows/build-mac.yml) [![build-win](https://github.com/podofo/podofo/actions/workflows/build-win.yml/badge.svg)](https://github.com/podofo/podofo/actions/workflows/build-win.yml)
+Note: This is a direct fork of [PoDoFo](https://github.com/podofo/podofo) which has support for desktop builds. This fork adds Android and iOS builds.
+It also adds Remote Signing session from [eudi-lib-podofo](https://github.com/eu-digital-identity-wallet/eudi-lib-podofo) fork.
+
+# PoDoFo [![build-linux](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-linux.yml/badge.svg)](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-linux.yml) [![build-mac](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-mac.yml/badge.svg)](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-mac.yml) [![build-win](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-win.yml/badge.svg)](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-win.yml) [![build-android](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-android.yml/badge.svg)](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-android.yml) [![build-ios](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-ios.yml/badge.svg)](https://github.com/Doko-Demo-Doa/podofo/actions/workflows/build-ios.yml)
 
 1.  [What is PoDoFo?](#what-is-podofo)
 2.  [Features](#features)
