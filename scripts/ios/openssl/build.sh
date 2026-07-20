@@ -98,6 +98,7 @@ function build() {
             --prefix="$INSTALL_DIR/$SLICE" \
             --openssldir="$INSTALL_DIR/$SLICE" \
             no-shared \
+            no-module \
             no-tests \
             threads
 

@@ -759,6 +759,33 @@ extern "C" {
         }
     }
 
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsEncrypted(
+        JNIEnv* env, jclass clazz, jstring jPath) {
+
+        PoDoFo::PdfMemDocument doc;
+        try {
+            std::string path = jstringToString(env, jPath);
+            doc.Load(path, std::string());
+        } catch (const PoDoFo::PdfError& err) {
+            // Loading with an empty password only throws InvalidPassword when
+            // the document has a real (non-empty) user password - that's the
+            // one error PoDoFo raises *because* the document is encrypted,
+            // not because it's broken. Anything else (corrupt file, not a
+            // PDF, etc.) should surface as a real failure. If the user
+            // password is itself empty (or there's no user password at all),
+            // Load succeeds and IsEncrypted() below still reports it correctly.
+            if (err.GetCode() == PoDoFo::PdfErrorCode::InvalidPassword) {
+                return JNI_TRUE;
+            }
+            throwJavaException(env, err.what());
+            return JNI_FALSE;
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return JNI_FALSE;
+        }
+        return doc.IsEncrypted() ? JNI_TRUE : JNI_FALSE;
+    }
+
     JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSave(
         JNIEnv* env, jobject thiz, jlong handle, jstring jPath) {
 
