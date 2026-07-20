@@ -235,6 +235,11 @@ namespace PoDoFo {
          * @brief Prints current session state to stdout (for diagnostics)
          */
         void printState() const;
+        void setSignerName(const std::string& name);
+        void setCreatingApplication(const std::string& application);
+        void setSignatureLocation(const std::string& location);
+        void setSignatureReason(const std::string& reason);
+        void setSignatureContactInfo(const std::string& contactInfo);
         /**
          * @brief Sets the timestamp token (base64 TSR) to be used in the session
          * @param responseTsrBase64 Base64-encoded timestamp response
@@ -373,6 +378,11 @@ namespace PoDoFo {
         std::vector<std::string>                    _certificateChainBase64;
         std::optional<std::string>                  _rootCertificateBase64;
         std::optional<std::string>                  _label;
+        std::optional<std::string>                  _signerName;
+        std::optional<std::string>                  _creatingApplication;
+        std::optional<std::string>                  _signatureLocation;
+        std::optional<std::string>                  _signatureReason;
+        std::optional<std::string>                  _signatureContactInfo;
         std::optional<std::string>                  _responseTsrBase64;
         std::optional<ValidationData>               _validationData;
         std::vector<unsigned char>                  _endCertificateDer;

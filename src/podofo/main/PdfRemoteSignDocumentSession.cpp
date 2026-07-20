@@ -106,6 +106,20 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::beginSigning() {
         auto& signature = static_cast<PoDoFo::PdfSignature&>(field);
         signature.MustGetWidget().SetFlags(PoDoFo::PdfAnnotationFlags::Invisible | PoDoFo::PdfAnnotationFlags::Hidden);
         signature.SetSignatureDate(PoDoFo::PdfDate::LocalNow());
+        if (_signerName)
+            signature.SetSignerName(PoDoFo::PdfString(*_signerName));
+        if (_creatingApplication)
+            signature.SetCreatingApplication(PoDoFo::PdfName(*_creatingApplication));
+        if (_signatureLocation)
+            signature.SetSignatureLocation(PoDoFo::PdfString(*_signatureLocation));
+        if (_signatureReason)
+            signature.SetSignatureReason(PoDoFo::PdfString(*_signatureReason));
+        if (_signatureContactInfo) {
+            signature.EnsureValueObject();
+            auto valueObj = signature.GetDictionary().FindKey("V");
+            if (valueObj != nullptr)
+                valueObj->GetDictionary().AddKey("ContactInfo"_n, PoDoFo::PdfString(*_signatureContactInfo));
+        }
 
         // All ADES_B_* levels use the same CMS structure (CAdES-BES aka PAdES_B); the
         // level only changes whether a signature-timestamp attribute (B_T and above)
@@ -317,6 +331,26 @@ void PoDoFo::PdfRemoteSignDocumentSession::printState() const {
         std::cout << "  Label:            " << *_label << "\n";
     if (!_responseTsr.empty())
         std::cout << "  TimestampToken:   " << _responseTsr.size() << " bytes\n";
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::setSignerName(const std::string& name) {
+    _signerName = name;
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::setCreatingApplication(const std::string& application) {
+    _creatingApplication = application;
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::setSignatureLocation(const std::string& location) {
+    _signatureLocation = location;
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::setSignatureReason(const std::string& reason) {
+    _signatureReason = reason;
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::setSignatureContactInfo(const std::string& contactInfo) {
+    _signatureContactInfo = contactInfo;
 }
 
 void PoDoFo::PdfRemoteSignDocumentSession::setTimestampToken(const std::string& responseTsrBase64) {

@@ -99,6 +99,61 @@ public class PoDoFoWrapper implements AutoCloseable {
   }
 
   /**
+   * Sets the signature /Name entry.
+   * Call before {@link #calculateHash()}.
+   */
+  public void setSignerName(String name) throws PoDoFoException {
+    if (nativeHandle == 0) {
+      throw new PoDoFoException("Session not initialized");
+    }
+    nativeSetSignerName(nativeHandle, name);
+  }
+
+  /**
+   * Sets the signature /Prop_Build/App/Name entry.
+   * Call before {@link #calculateHash()}.
+   */
+  public void setCreatingApplication(String application) throws PoDoFoException {
+    if (nativeHandle == 0) {
+      throw new PoDoFoException("Session not initialized");
+    }
+    nativeSetCreatingApplication(nativeHandle, application);
+  }
+
+  /**
+   * Sets the signature /Location entry.
+   * Call before {@link #calculateHash()}.
+   */
+  public void setSignatureLocation(String location) throws PoDoFoException {
+    if (nativeHandle == 0) {
+      throw new PoDoFoException("Session not initialized");
+    }
+    nativeSetSignatureLocation(nativeHandle, location);
+  }
+
+  /**
+   * Sets the signature /Reason entry.
+   * Call before {@link #calculateHash()}.
+   */
+  public void setSignatureReason(String reason) throws PoDoFoException {
+    if (nativeHandle == 0) {
+      throw new PoDoFoException("Session not initialized");
+    }
+    nativeSetSignatureReason(nativeHandle, reason);
+  }
+
+  /**
+   * Sets the signature /ContactInfo entry.
+   * Call before {@link #calculateHash()}.
+   */
+  public void setSignatureContactInfo(String contactInfo) throws PoDoFoException {
+    if (nativeHandle == 0) {
+      throw new PoDoFoException("Session not initialized");
+    }
+    nativeSetSignatureContactInfo(nativeHandle, contactInfo);
+  }
+
+  /**
    * Calculate hash for signing
    *
    * @return The hash as a string, or null if calculation failed
@@ -262,6 +317,16 @@ public class PoDoFoWrapper implements AutoCloseable {
   private native boolean nativeIsLoaded(long handle);
 
   private native void nativePrintState(long handle);
+
+  private native void nativeSetSignerName(long handle, String name);
+
+  private native void nativeSetCreatingApplication(long handle, String application);
+
+  private native void nativeSetSignatureLocation(long handle, String location);
+
+  private native void nativeSetSignatureReason(long handle, String reason);
+
+  private native void nativeSetSignatureContactInfo(long handle, String contactInfo);
 
   private native String nativeCalculateHash(long handle);
 

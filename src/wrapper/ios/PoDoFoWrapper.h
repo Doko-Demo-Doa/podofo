@@ -29,6 +29,21 @@ NS_ASSUME_NONNULL_BEGIN
 /// Prints the current session state to stdout (for diagnostics).
 - (void)printState;
 
+/// Sets the signature /Name entry. Call before calculateHashAndReturnError:.
+- (BOOL)setSignerName:(NSString *)name error:(NSError **)error;
+
+/// Sets the signature /Prop_Build/App/Name entry. Call before calculateHashAndReturnError:.
+- (BOOL)setCreatingApplication:(NSString *)application error:(NSError **)error;
+
+/// Sets the signature /Location entry. Call before calculateHashAndReturnError:.
+- (BOOL)setSignatureLocation:(NSString *)location error:(NSError **)error;
+
+/// Sets the signature /Reason entry. Call before calculateHashAndReturnError:.
+- (BOOL)setSignatureReason:(NSString *)reason error:(NSError **)error;
+
+/// Sets the signature /ContactInfo entry. Call before calculateHashAndReturnError:.
+- (BOOL)setSignatureContactInfo:(NSString *)contactInfo error:(NSError **)error;
+
 /// Starts the signing process and computes the document hash to be signed remotely.
 - (nullable NSString *)calculateHashAndReturnError:(NSError **)error;
 

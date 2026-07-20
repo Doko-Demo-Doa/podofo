@@ -95,6 +95,71 @@ static std::optional<ValidationData> PoDoFoValidationDataFromArrays(NSArray<NSSt
     return YES;
 }
 
+- (BOOL)setSignerName:(NSString *)name error:(NSError **)error
+{
+    if (![self checkLoaded:error])
+        return NO;
+    try {
+        _session->setSignerName(name.UTF8String);
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
+- (BOOL)setCreatingApplication:(NSString *)application error:(NSError **)error
+{
+    if (![self checkLoaded:error])
+        return NO;
+    try {
+        _session->setCreatingApplication(application.UTF8String);
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
+- (BOOL)setSignatureLocation:(NSString *)location error:(NSError **)error
+{
+    if (![self checkLoaded:error])
+        return NO;
+    try {
+        _session->setSignatureLocation(location.UTF8String);
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
+- (BOOL)setSignatureReason:(NSString *)reason error:(NSError **)error
+{
+    if (![self checkLoaded:error])
+        return NO;
+    try {
+        _session->setSignatureReason(reason.UTF8String);
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
+- (BOOL)setSignatureContactInfo:(NSString *)contactInfo error:(NSError **)error
+{
+    if (![self checkLoaded:error])
+        return NO;
+    try {
+        _session->setSignatureContactInfo(contactInfo.UTF8String);
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
 - (nullable NSString *)calculateHashAndReturnError:(NSError **)error
 {
     if (![self checkLoaded:error])

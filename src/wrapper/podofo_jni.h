@@ -28,6 +28,11 @@ public:
 
     bool isLoaded() const;
     void printState() const;
+    void setSignerName(const std::string &name);
+    void setCreatingApplication(const std::string &application);
+    void setSignatureLocation(const std::string &location);
+    void setSignatureReason(const std::string &reason);
+    void setSignatureContactInfo(const std::string &contactInfo);
     std::string calculateHash();
     void finalizeSigningWithSignedHash(const std::string &signedHash, const std::string &tsr, const std::optional<PoDoFo::ValidationData> &validationData);
     std::string beginSigningLTA();
@@ -61,6 +66,21 @@ extern "C"
 
     JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativePrintState(
         JNIEnv *env, jobject thiz, jlong nativeHandle);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetSignerName(
+        JNIEnv *env, jobject thiz, jlong nativeHandle, jstring jName);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetCreatingApplication(
+        JNIEnv *env, jobject thiz, jlong nativeHandle, jstring jApplication);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetSignatureLocation(
+        JNIEnv *env, jobject thiz, jlong nativeHandle, jstring jLocation);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetSignatureReason(
+        JNIEnv *env, jobject thiz, jlong nativeHandle, jstring jReason);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetSignatureContactInfo(
+        JNIEnv *env, jobject thiz, jlong nativeHandle, jstring jContactInfo);
 
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeCalculateHash(
         JNIEnv *env, jobject thiz, jlong nativeHandle);

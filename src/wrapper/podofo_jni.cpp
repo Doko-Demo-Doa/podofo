@@ -55,6 +55,46 @@ void PoDoFoWrapper::printState() const {
     }
 }
 
+void PoDoFoWrapper::setSignerName(const std::string& name) {
+    if (!nativeSession) {
+        throw std::runtime_error("PoDoFo session is not initialized.");
+    }
+
+    nativeSession->setSignerName(name);
+}
+
+void PoDoFoWrapper::setCreatingApplication(const std::string& application) {
+    if (!nativeSession) {
+        throw std::runtime_error("PoDoFo session is not initialized.");
+    }
+
+    nativeSession->setCreatingApplication(application);
+}
+
+void PoDoFoWrapper::setSignatureLocation(const std::string& location) {
+    if (!nativeSession) {
+        throw std::runtime_error("PoDoFo session is not initialized.");
+    }
+
+    nativeSession->setSignatureLocation(location);
+}
+
+void PoDoFoWrapper::setSignatureReason(const std::string& reason) {
+    if (!nativeSession) {
+        throw std::runtime_error("PoDoFo session is not initialized.");
+    }
+
+    nativeSession->setSignatureReason(reason);
+}
+
+void PoDoFoWrapper::setSignatureContactInfo(const std::string& contactInfo) {
+    if (!nativeSession) {
+        throw std::runtime_error("PoDoFo session is not initialized.");
+    }
+
+    nativeSession->setSignatureContactInfo(contactInfo);
+}
+
 std::string PoDoFoWrapper::calculateHash() {
     if (!nativeSession) {
         throw std::runtime_error("PoDoFo session is not initialized.");
@@ -329,6 +369,86 @@ extern "C" {
 
         auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
         wrapper->printState();
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetSignerName(
+        JNIEnv* env, jobject thiz, jlong nativeHandle, jstring jName) {
+
+        if (!nativeHandle) {
+            throwJavaException(env, "Session not initialized");
+            return;
+        }
+
+        try {
+            auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
+            wrapper->setSignerName(jstringToString(env, jName));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetCreatingApplication(
+        JNIEnv* env, jobject thiz, jlong nativeHandle, jstring jApplication) {
+
+        if (!nativeHandle) {
+            throwJavaException(env, "Session not initialized");
+            return;
+        }
+
+        try {
+            auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
+            wrapper->setCreatingApplication(jstringToString(env, jApplication));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetSignatureLocation(
+        JNIEnv* env, jobject thiz, jlong nativeHandle, jstring jLocation) {
+
+        if (!nativeHandle) {
+            throwJavaException(env, "Session not initialized");
+            return;
+        }
+
+        try {
+            auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
+            wrapper->setSignatureLocation(jstringToString(env, jLocation));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetSignatureReason(
+        JNIEnv* env, jobject thiz, jlong nativeHandle, jstring jReason) {
+
+        if (!nativeHandle) {
+            throwJavaException(env, "Session not initialized");
+            return;
+        }
+
+        try {
+            auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
+            wrapper->setSignatureReason(jstringToString(env, jReason));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetSignatureContactInfo(
+        JNIEnv* env, jobject thiz, jlong nativeHandle, jstring jContactInfo) {
+
+        if (!nativeHandle) {
+            throwJavaException(env, "Session not initialized");
+            return;
+        }
+
+        try {
+            auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
+            wrapper->setSignatureContactInfo(jstringToString(env, jContactInfo));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
     }
 
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeCalculateHash(
