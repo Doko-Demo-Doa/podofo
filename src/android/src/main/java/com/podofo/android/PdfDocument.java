@@ -67,21 +67,6 @@ public class PdfDocument implements AutoCloseable {
   }
 
   /**
-   * Checks whether the PDF at {@code path} is encrypted, without needing its
-   * password and without opening/closing a document yourself.
-   *
-   * @throws PoDoFoException if the file can't be parsed at all (e.g. not a
-   *     valid PDF, or doesn't exist) - not merely because it happens to be
-   *     encrypted.
-   */
-  public static boolean isEncrypted(String path) throws PoDoFoException {
-    if (path == null) {
-      throw new IllegalArgumentException("path must not be null");
-    }
-    return nativeIsEncrypted(path);
-  }
-
-  /**
    * Saves the complete document to a file.
    *
    * @throws PoDoFoException if the document can't be written
@@ -345,15 +330,6 @@ public class PdfDocument implements AutoCloseable {
   }
 
   /**
-   * @return true if this document was loaded from (or has been set to
-   *         become, pending save) an encrypted file
-   */
-  public boolean isEncrypted() {
-    checkOpen();
-    return nativeIsEncrypted(nativeHandle);
-  }
-
-  /**
    * @return the number of AcroForm fields in this document (0 if there is
    *         no AcroForm yet)
    */
@@ -484,8 +460,6 @@ public class PdfDocument implements AutoCloseable {
 
   private static native long nativeLoad(String path, String password);
 
-  private static native boolean nativeIsEncrypted(String path);
-
   private native void nativeSave(long handle, String path);
 
   private native void nativeClose(long handle);
@@ -523,8 +497,6 @@ public class PdfDocument implements AutoCloseable {
   private native long nativeCreateImageFromBuffer(long handle, byte[] data);
 
   private native void nativeSetEncrypted(long handle, String userPassword, String ownerPassword, int permissions);
-
-  private native boolean nativeIsEncrypted(long handle);
 
   private native String nativeGetTitle(long handle);
 

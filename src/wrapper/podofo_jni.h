@@ -228,9 +228,6 @@ extern "C"
     JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeSetEncrypted(
         JNIEnv *env, jobject thiz, jlong handle, jstring jUserPassword, jstring jOwnerPassword, jint permissions);
 
-    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsEncrypted(
-        JNIEnv *env, jobject thiz, jlong handle);
-
     // PdfPage (PoDoFo::PdfPage) — non-owning: the page is owned by its parent
     // document's page tree, so there is deliberately no nativeClose/delete here.
     JNIEXPORT jdouble JNICALL Java_com_podofo_android_PdfPage_nativeGetWidth(
