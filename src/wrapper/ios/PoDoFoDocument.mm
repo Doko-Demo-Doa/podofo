@@ -126,6 +126,73 @@ using namespace PoDoFo;
     }
 }
 
+- (nullable PoDoFoPage *)createPageAtIndex:(NSUInteger)index
+                                     width:(double)width
+                                    height:(double)height
+                                     error:(NSError **)error
+{
+    if (![self checkOpen:error])
+        return nil;
+    try {
+        auto &page = _doc->GetPages().CreatePageAt((unsigned)index, PoDoFo::Rect(0, 0, width, height));
+        return [[PoDoFoPage alloc] initWithPage:page document:self];
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return nil;
+    }
+}
+
+- (BOOL)appendPagesFromDocument:(PoDoFoDocument *)source error:(NSError **)error
+{
+    if (![self checkOpen:error])
+        return NO;
+    if (![source checkOpen:error])
+        return NO;
+    try {
+        _doc->GetPages().AppendDocumentPages(*source.podofo_document);
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
+- (BOOL)appendPagesFromDocument:(PoDoFoDocument *)source
+                      pageIndex:(NSUInteger)pageIndex
+                      pageCount:(NSUInteger)pageCount
+                          error:(NSError **)error
+{
+    if (![self checkOpen:error])
+        return NO;
+    if (![source checkOpen:error])
+        return NO;
+    try {
+        _doc->GetPages().AppendDocumentPages(*source.podofo_document, (unsigned)pageIndex, (unsigned)pageCount);
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
+- (BOOL)insertPageFromDocument:(PoDoFoDocument *)source
+                     pageIndex:(NSUInteger)pageIndex
+                       atIndex:(NSUInteger)atIndex
+                         error:(NSError **)error
+{
+    if (![self checkOpen:error])
+        return NO;
+    if (![source checkOpen:error])
+        return NO;
+    try {
+        _doc->GetPages().InsertDocumentPageAt((unsigned)atIndex, *source.podofo_document, (unsigned)pageIndex);
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
 static bool tryGetStandard14FontType(NSString *name, PdfStandard14FontType &fontType)
 {
     std::string n = name.UTF8String;

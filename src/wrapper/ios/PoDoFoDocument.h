@@ -54,6 +54,28 @@ NS_ASSUME_NONNULL_BEGIN
 /// C++ semantics (indices shift after removal).
 - (BOOL)removePageAtIndex:(NSUInteger)index error:(NSError **)error;
 
+/// Creates a new page and inserts it at the given 0-based index. Pages at or
+/// after index shift forward by one.
+- (nullable PoDoFoPage *)createPageAtIndex:(NSUInteger)index
+                                     width:(double)width
+                                    height:(double)height
+                                     error:(NSError **)error;
+
+/// Appends every page from source to the end of this document.
+- (BOOL)appendPagesFromDocument:(PoDoFoDocument *)source error:(NSError **)error;
+
+/// Appends a contiguous range of pages from source to the end of this document.
+- (BOOL)appendPagesFromDocument:(PoDoFoDocument *)source
+                      pageIndex:(NSUInteger)pageIndex
+                      pageCount:(NSUInteger)pageCount
+                          error:(NSError **)error;
+
+/// Inserts a single page from source at the given 0-based index in this document.
+- (BOOL)insertPageFromDocument:(PoDoFoDocument *)source
+                     pageIndex:(NSUInteger)pageIndex
+                       atIndex:(NSUInteger)atIndex
+                         error:(NSError **)error;
+
 /// Gets one of the 14 PDF "standard" fonts (Helvetica, Times, Courier,
 /// Symbol, ZapfDingbats and their bold/italic variants) — always renderable
 /// by any PDF viewer, no font embedding needed. This works without

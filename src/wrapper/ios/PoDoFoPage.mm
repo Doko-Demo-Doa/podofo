@@ -115,8 +115,8 @@ static bool tryGetAnnotationType(NSString *name, PdfAnnotationType &type)
 }
 
 - (nullable PoDoFoAnnotation *)createAnnotationOfType:(NSString *)annotationType
-                                                  rect:(CGRect)rect
-                                                 error:(NSError **)error
+                                                   rect:(CGRect)rect
+                                                  error:(NSError **)error
 {
     PdfAnnotationType type;
     if (!tryGetAnnotationType(annotationType, type)) {
@@ -131,6 +131,69 @@ static bool tryGetAnnotationType(NSString *name, PdfAnnotationType &type)
     } catch (const std::exception &e) {
         PoDoFoSetErrorFromException(error, e);
         return nil;
+    }
+}
+
+- (NSInteger)rotation
+{
+    return (NSInteger)_page->GetRotation();
+}
+
+- (BOOL)setRotation:(NSInteger)rotation error:(NSError **)error
+{
+    try {
+        _page->SetRotation((int)rotation);
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
+static CGRect CGRectFromPoDoFoRect(const PoDoFo::Rect &rect)
+{
+    return CGRectMake(rect.X, rect.Y, rect.Width, rect.Height);
+}
+
+- (CGRect)mediaBox
+{
+    return CGRectFromPoDoFoRect(_page->GetMediaBox());
+}
+
+- (BOOL)setMediaBox:(CGRect)rect error:(NSError **)error
+{
+    try {
+        _page->SetMediaBox(PoDoFo::Rect(rect.origin.x, rect.origin.y, rect.size.width, rect.size.height));
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
+- (CGRect)cropBox
+{
+    return CGRectFromPoDoFoRect(_page->GetCropBox());
+}
+
+- (BOOL)setCropBox:(CGRect)rect error:(NSError **)error
+{
+    try {
+        _page->SetCropBox(PoDoFo::Rect(rect.origin.x, rect.origin.y, rect.size.width, rect.size.height));
+        return YES;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
+    }
+}
+
+- (BOOL)moveToIndex:(NSUInteger)newIndex error:(NSError **)error
+{
+    try {
+        return _page->MoveTo((unsigned)newIndex) ? YES : NO;
+    } catch (const std::exception &e) {
+        PoDoFoSetErrorFromException(error, e);
+        return NO;
     }
 }
 

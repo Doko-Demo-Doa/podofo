@@ -44,8 +44,33 @@ NS_ASSUME_NONNULL_BEGIN
 /// @param annotationType one of PoDoFo's PdfAnnotationType names, eg.
 ///        "Text", "Link", "Highlight", "Square", "Line", "Popup"
 - (nullable PoDoFoAnnotation *)createAnnotationOfType:(NSString *)annotationType
-                                                  rect:(CGRect)rect
-                                                 error:(NSError **)error;
+                                                   rect:(CGRect)rect
+                                                  error:(NSError **)error;
+
+/// The page's clockwise rotation in degrees, normalized to one of
+/// 0, 90, 180, 270 (from the page's /Rotate entry).
+@property (nonatomic, readonly) NSInteger rotation;
+
+/// Sets the page's /Rotate entry.
+/// @param rotation clockwise rotation in degrees; must be a multiple of 90
+///                 (negative values are normalized by PoDoFo)
+- (BOOL)setRotation:(NSInteger)rotation error:(NSError **)error;
+
+/// The page's /MediaBox as a rect in PDF units.
+@property (nonatomic, readonly) CGRect mediaBox;
+
+/// Sets the page's /MediaBox, resizing the page.
+- (BOOL)setMediaBox:(CGRect)rect error:(NSError **)error;
+
+/// The page's /CropBox (visible region) in PDF units, or the /MediaBox if no /CropBox is set.
+@property (nonatomic, readonly) CGRect cropBox;
+
+/// Sets the page's /CropBox (visible region).
+- (BOOL)setCropBox:(CGRect)rect error:(NSError **)error;
+
+/// Moves this page to a new 0-based index within its parent document's page tree.
+/// @return YES if the page was actually moved, NO if it was already at newIndex.
+- (BOOL)moveToIndex:(NSUInteger)newIndex error:(NSError **)error;
 
 @end
 
