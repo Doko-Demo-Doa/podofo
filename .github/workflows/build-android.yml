@@ -107,7 +107,7 @@ jobs:
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2.23
         with:
-          key: android-ndk-${{ env.NDK_VERSION }}
+          key: android-ccache-${{ env.NDK_VERSION }}-${{ hashFiles('scripts/android/**') }}
           max-size: 2G
 
       # Building all 8 native dependencies for all 4 ABIs from source is the
