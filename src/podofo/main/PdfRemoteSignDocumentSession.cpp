@@ -19,6 +19,7 @@
 #include <openssl/x509v3.h>
 #include <openssl/ocsp.h>
 #include <openssl/err.h>
+#include <algorithm>
 #include <iomanip>
 #include <cstring>
 
@@ -101,10 +102,20 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::beginSigning() {
         auto& acroForm = _doc.GetOrCreateAcroForm();
         acroForm.GetDictionary().AddKey("SigFlags"_n, (int64_t)3);
 
-        auto& page = _doc.GetPages().GetPageAt(0);
-        auto& field = page.CreateField("Signature", PoDoFo::PdfFieldType::Signature, PoDoFo::Rect(0, 0, 0, 0));
+        auto& page = _visibleSignature
+            ? _doc.GetPages().GetPageAt(_visibleSignature->PageIndex)
+            : _doc.GetPages().GetPageAt(0);
+        auto& field = page.CreateField(
+            "Signature",
+            PoDoFo::PdfFieldType::Signature,
+            _visibleSignature ? _visibleSignature->WidgetRect : PoDoFo::Rect(0, 0, 0, 0));
         auto& signature = static_cast<PoDoFo::PdfSignature&>(field);
-        signature.MustGetWidget().SetFlags(PoDoFo::PdfAnnotationFlags::Invisible | PoDoFo::PdfAnnotationFlags::Hidden);
+        if (_visibleSignature) {
+            applySignatureAppearance(signature, *_visibleSignature);
+        }
+        else {
+            signature.MustGetWidget().SetFlags(PoDoFo::PdfAnnotationFlags::Invisible | PoDoFo::PdfAnnotationFlags::Hidden);
+        }
         signature.SetSignatureDate(PoDoFo::PdfDate::LocalNow());
         if (_signerName)
             signature.SetSignerName(PoDoFo::PdfString(*_signerName));
@@ -351,6 +362,41 @@ void PoDoFo::PdfRemoteSignDocumentSession::setSignatureReason(const std::string&
 
 void PoDoFo::PdfRemoteSignDocumentSession::setSignatureContactInfo(const std::string& contactInfo) {
     _signatureContactInfo = contactInfo;
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::setVisibleSignature(unsigned pageIndex, const Rect& widgetRect, const std::optional<std::string>& text) {
+    if (widgetRect.Width <= 0 || widgetRect.Height <= 0) {
+        throw std::invalid_argument("Visible signature rectangle width and height must be > 0");
+    }
+    _visibleSignature = PdfVisibleSignatureOptions{ pageIndex, widgetRect, text };
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::clearVisibleSignature() {
+    _visibleSignature.reset();
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::applySignatureAppearance(PdfSignature& signature, const PdfVisibleSignatureOptions& options) {
+    const auto pageCount = _doc.GetPages().GetCount();
+    if (options.PageIndex >= pageCount) {
+        throw std::out_of_range("Visible signature pageIndex is outside the document page range");
+    }
+
+    const auto appearanceText = options.Text.value_or("Digitally signed");
+    auto xObject = _doc.CreateXObjectForm(Rect(0, 0, options.WidgetRect.Width, options.WidgetRect.Height));
+
+    PdfPainter painter;
+    painter.SetCanvas(*xObject);
+    painter.GraphicsState.SetStrokingColor(PdfColor(0.1, 0.1, 0.1));
+    painter.GraphicsState.SetNonStrokingColor(PdfColor(1.0, 1.0, 1.0));
+    painter.DrawRectangle(0, 0, options.WidgetRect.Width, options.WidgetRect.Height, PdfPathDrawMode::Stroke);
+
+    auto& font = _doc.GetFonts().GetStandard14Font(PdfStandard14FontType::Helvetica);
+    painter.TextState.SetFont(font, 10);
+    painter.GraphicsState.SetNonStrokingColor(PdfColor(0.0, 0.0, 0.0));
+    painter.DrawTextMultiLine(appearanceText, 6, 6, std::max(0.0, options.WidgetRect.Width - 12), std::max(0.0, options.WidgetRect.Height - 12));
+    painter.FinishDrawing();
+
+    signature.MustGetWidget().SetAppearanceStream(*xObject);
 }
 
 void PoDoFo::PdfRemoteSignDocumentSession::setTimestampToken(const std::string& responseTsrBase64) {

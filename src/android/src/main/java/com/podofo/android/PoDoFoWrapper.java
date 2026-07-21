@@ -180,6 +180,18 @@ public class PoDoFoWrapper implements AutoCloseable {
   }
 
   /**
+   * Makes the signature visible by placing its widget on a page.
+   * Call before {@link #calculateHash()}.
+   */
+  public void setVisibleSignature(int pageIndex, double x, double y, double width, double height, String text)
+      throws PoDoFoException {
+    if (nativeHandle == 0) {
+      throw new PoDoFoException("Session not initialized");
+    }
+    nativeSetVisibleSignature(nativeHandle, pageIndex, x, y, width, height, text);
+  }
+
+  /**
    * Calculate hash for signing
    *
    * @return The hash as a string, or null if calculation failed
@@ -353,6 +365,9 @@ public class PoDoFoWrapper implements AutoCloseable {
   private native void nativeSetSignatureReason(long handle, String reason);
 
   private native void nativeSetSignatureContactInfo(long handle, String contactInfo);
+
+  private native void nativeSetVisibleSignature(long handle, int pageIndex,
+      double x, double y, double width, double height, String text);
 
   private native String nativeCalculateHash(long handle);
 

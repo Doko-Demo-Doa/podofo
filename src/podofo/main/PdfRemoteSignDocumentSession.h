@@ -166,6 +166,15 @@ namespace PoDoFo {
     };
 
     /**
+     * @brief Optional visible signature widget placement and appearance text.
+     */
+    struct PODOFO_API PdfVisibleSignatureOptions final {
+        unsigned PageIndex = 0;
+        Rect WidgetRect;
+        std::optional<std::string> Text;
+    };
+
+    /**
      * @brief Represents a single PDF remote signing session.
      *
      * The flow is split into two steps:
@@ -240,6 +249,8 @@ namespace PoDoFo {
         void setSignatureLocation(const std::string& location);
         void setSignatureReason(const std::string& reason);
         void setSignatureContactInfo(const std::string& contactInfo);
+        void setVisibleSignature(unsigned pageIndex, const Rect& widgetRect, const std::optional<std::string>& text = std::nullopt);
+        void clearVisibleSignature();
         /**
          * @brief Sets the timestamp token (base64 TSR) to be used in the session
          * @param responseTsrBase64 Base64-encoded timestamp response
@@ -316,6 +327,7 @@ namespace PoDoFo {
          * @brief Create or update the DSS dictionary in the document with provided artifacts.
          */
         void createOrUpdateDSSCatalog(PdfMemDocument& doc, const ValidationData& validationData);
+        void applySignatureAppearance(PdfSignature& signature, const PdfVisibleSignatureOptions& options);
         /**
          * @brief Creates a stream object for a certificate
          */
@@ -383,6 +395,7 @@ namespace PoDoFo {
         std::optional<std::string>                  _signatureLocation;
         std::optional<std::string>                  _signatureReason;
         std::optional<std::string>                  _signatureContactInfo;
+        std::optional<PdfVisibleSignatureOptions>   _visibleSignature;
         std::optional<std::string>                  _responseTsrBase64;
         std::optional<ValidationData>               _validationData;
         std::vector<unsigned char>                  _endCertificateDer;

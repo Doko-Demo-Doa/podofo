@@ -97,6 +97,14 @@ void PoDoFoWrapper::setSignatureContactInfo(const std::string& contactInfo) {
     nativeSession->setSignatureContactInfo(contactInfo);
 }
 
+void PoDoFoWrapper::setVisibleSignature(unsigned pageIndex, double x, double y, double width, double height, const std::optional<std::string>& text) {
+    if (!nativeSession) {
+        throw std::runtime_error("PoDoFo session is not initialized.");
+    }
+
+    nativeSession->setVisibleSignature(pageIndex, PoDoFo::Rect(x, y, width, height), text);
+}
+
 std::string PoDoFoWrapper::calculateHash() {
     if (!nativeSession) {
         throw std::runtime_error("PoDoFo session is not initialized.");
@@ -456,6 +464,32 @@ extern "C" {
         try {
             auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
             wrapper->setSignatureContactInfo(jstringToString(env, jContactInfo));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetVisibleSignature(
+        JNIEnv* env, jobject thiz, jlong nativeHandle, jint pageIndex,
+        jdouble x, jdouble y, jdouble width, jdouble height, jstring jText) {
+
+        if (!nativeHandle) {
+            throwJavaException(env, "Session not initialized");
+            return;
+        }
+
+        try {
+            if (pageIndex < 0) {
+                throw std::invalid_argument("Visible signature pageIndex must be >= 0");
+            }
+            auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
+            wrapper->setVisibleSignature(
+                static_cast<unsigned>(pageIndex),
+                x,
+                y,
+                width,
+                height,
+                optionalJstringToString(env, jText));
         } catch (const std::exception& e) {
             throwJavaException(env, e.what());
         }
