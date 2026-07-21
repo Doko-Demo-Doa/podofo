@@ -67,7 +67,7 @@ jobs:
       - name: Set up ccache
         uses: hendrikmuhs/ccache-action@v1.2.23
         with:
-          key: ios
+          key: ios-deps-v2-${{ hashFiles('scripts/ios/*.sh', 'scripts/ios/*.cmake', 'scripts/ios/**') }}
           max-size: 2G
 
       # Building all 8 native dependencies for all 3 slices from source is
