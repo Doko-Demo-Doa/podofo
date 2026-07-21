@@ -127,20 +127,56 @@ jobs:
       # release per version tag rather than each workflow racing to create
       # its own (GitHub only allows one release per tag).
       - name: Create GitHub Release
+        id: create_release
         if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ steps.release.outputs.version }}"
-          mv "build/ios/framework/PoDoFo-${VERSION}.xcframework.zip" "PoDoFo-${VERSION}.xcframework.zip"
+          ZIP="PoDoFo-${VERSION}.xcframework.zip"
+          mv "build/ios/framework/${ZIP}" "${ZIP}"
+
+          # Computed once here and reused by "Update Package.swift" below —
+          # swift package compute-checksum IS a SHA256 hex digest of the
+          # archive under the hood, so this doubles as the SHA256 to publish
+          # in the release notes without hashing the file twice.
+          CHECKSUM="$(swift package compute-checksum "${ZIP}")"
+          echo "checksum=${CHECKSUM}" >> "$GITHUB_OUTPUT"
+          echo "${CHECKSUM}  ${ZIP}" > "${ZIP}.sha256"
+
           if gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
-            gh release upload "${{ github.ref_name }}" "PoDoFo-${VERSION}.xcframework.zip" --clobber
+            gh release upload "${{ github.ref_name }}" "${ZIP}" "${ZIP}.sha256" --clobber
           else
             gh release create "${{ github.ref_name }}" \
                 --title "${{ github.ref_name }}" \
                 --generate-notes \
-                "PoDoFo-${VERSION}.xcframework.zip"
+                "${ZIP}" "${ZIP}.sha256"
           fi
+
+          # Idempotent notes merge: build-android.yml appends its own
+          # markers-delimited section the same way, so re-runs (or running
+          # after/before the Android workflow, in either order) replace only
+          # this workflow's own section rather than clobbering the other's.
+          # The markers contain no characters special to sed's /pattern/,/pattern/d
+          # range addressing (no literal "/"), so no escaping is needed.
+          cat > ios-section.md << 'EOF'
+          <!-- ios-install-section:start -->
+          ### 📱 iOS — `PoDoFo.xcframework`
+
+          SHA256: `PLACEHOLDER_CHECKSUM`
+
+          Via Swift Package Manager (root `Package.swift` is updated by this release to point at this asset):
+          ```swift
+          .package(url: "https://github.com/PLACEHOLDER_REPO", from: "PLACEHOLDER_VERSION")
+          ```
+          <!-- ios-install-section:end -->
+          EOF
+          sed -i.bak "s/PLACEHOLDER_CHECKSUM/${CHECKSUM}/; s#PLACEHOLDER_REPO#${{ github.repository }}#; s/PLACEHOLDER_VERSION/${VERSION}/" ios-section.md
+
+          gh release view "${{ github.ref_name }}" --json body -q .body > current-notes.md
+          sed '/<!-- ios-install-section:start -->/,/<!-- ios-install-section:end -->/d' current-notes.md > stripped-notes.md
+          cat stripped-notes.md ios-section.md > new-notes.md
+          gh release edit "${{ github.ref_name }}" --notes-file new-notes.md
 
       # Keeps the root Package.swift's binaryTarget pointed at this release's
       # asset with the correct checksum, without ever committing the
@@ -152,7 +188,7 @@ jobs:
         run: |
           VERSION="${{ steps.release.outputs.version }}"
           URL="https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/PoDoFo-${VERSION}.xcframework.zip"
-          CHECKSUM="$(swift package compute-checksum "PoDoFo-${VERSION}.xcframework.zip")"
+          CHECKSUM="${{ steps.create_release.outputs.checksum }}"
           cat > Package.swift << EOF
           // swift-tools-version:5.7
           import PackageDescription

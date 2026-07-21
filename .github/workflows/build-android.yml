@@ -253,3 +253,33 @@ jobs:
                 --generate-notes \
                 release-assets/*.aar
           fi
+
+          # Idempotent notes merge: build-ios.yml appends its own
+          # markers-delimited section the same way, so re-runs (or running
+          # after/before the iOS workflow, in either order) replace only
+          # this workflow's own section rather than clobbering the other's.
+          # The markers contain no characters special to sed's /pattern/,/pattern/d
+          # range addressing (no literal "/"), so no escaping is needed.
+          cat > android-section.md << 'EOF'
+          <!-- android-install-section:start -->
+          ### 🤖 Android (Gradle)
+
+          Published to Maven Central:
+
+          ```kotlin
+          repositories {
+              mavenCentral()
+          }
+
+          dependencies {
+              implementation("io.github.doko-demo-doa:podofo-android:PLACEHOLDER_VERSION")
+          }
+          ```
+          <!-- android-install-section:end -->
+          EOF
+          sed -i.bak "s/PLACEHOLDER_VERSION/${VERSION}/" android-section.md
+
+          gh release view "${{ github.ref_name }}" --json body -q .body > current-notes.md
+          sed '/<!-- android-install-section:start -->/,/<!-- android-install-section:end -->/d' current-notes.md > stripped-notes.md
+          cat stripped-notes.md android-section.md > new-notes.md
+          gh release edit "${{ github.ref_name }}" --notes-file new-notes.md
