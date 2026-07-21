@@ -7,7 +7,8 @@ std::unique_ptr<PoDoFoWrapper> PoDoFoWrapper::initialize(const std::string& conf
                                      const std::string& inputPath,
                                      const std::string& outputPath,
                                      const std::string& certificate,
-                                     const std::vector<std::string>& chainCertificates) {
+                                     const std::vector<std::string>& chainCertificates,
+                                     const std::optional<std::string>& rootCertificate) {
     try {
         __android_log_print(ANDROID_LOG_INFO, "PoDoFo", "Creating PoDoFoWrapper instance");
         auto wrapper = std::make_unique<PoDoFoWrapper>();
@@ -19,6 +20,7 @@ std::unique_ptr<PoDoFoWrapper> PoDoFoWrapper::initialize(const std::string& conf
         __android_log_print(ANDROID_LOG_INFO, "PoDoFo", "  Output Path: %s", outputPath.c_str());
         __android_log_print(ANDROID_LOG_INFO, "PoDoFo", "  Certificate length: %zu", certificate.length());
         __android_log_print(ANDROID_LOG_INFO, "PoDoFo", "  Chain Certificates count: %zu", chainCertificates.size());
+        __android_log_print(ANDROID_LOG_INFO, "PoDoFo", "  Root Certificate: %s", rootCertificate.has_value() ? "provided" : "null");
 
         wrapper->nativeSession = std::make_unique<PoDoFo::PdfRemoteSignDocumentSession>(
             conformanceLevel,
@@ -27,7 +29,7 @@ std::unique_ptr<PoDoFoWrapper> PoDoFoWrapper::initialize(const std::string& conf
             outputPath,
             certificate,
             chainCertificates,
-            std::nullopt
+            rootCertificate
         );
 
         __android_log_print(ANDROID_LOG_INFO, "PoDoFo", "PdfRemoteSignDocumentSession created successfully");
@@ -252,6 +254,13 @@ std::string jstringToString(JNIEnv* env, jstring jStr) {
     return str;
 }
 
+std::optional<std::string> optionalJstringToString(JNIEnv* env, jstring jStr) {
+    if (!jStr) {
+        return std::nullopt;
+    }
+    return jstringToString(env, jStr);
+}
+
 std::vector<std::string> jstringArrayToVector(JNIEnv* env, jobjectArray jArray) {
     std::vector<std::string> result;
 
@@ -306,7 +315,7 @@ extern "C" {
     JNIEXPORT jlong JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeInit(
         JNIEnv* env, jobject thiz, jstring jConformanceLevel, jstring jHashAlgorithm,
         jstring jInputPath, jstring jOutputPath, jstring jCertificate,
-        jobjectArray jChainCertificates) {
+        jobjectArray jChainCertificates, jstring jRootCertificate) {
 
         try {
             // Convert Java strings to C++ strings
@@ -316,11 +325,12 @@ extern "C" {
             std::string outputPath = jstringToString(env, jOutputPath);
             std::string certificate = jstringToString(env, jCertificate);
             std::vector<std::string> chainCertificates = jstringArrayToVector(env, jChainCertificates);
+            std::optional<std::string> rootCertificate = optionalJstringToString(env, jRootCertificate);
 
             // Create the wrapper using the static factory method
             auto wrapper_unique = PoDoFoWrapper::initialize(
                 conformanceLevel, hashAlgorithm, inputPath, outputPath,
-                certificate, chainCertificates);
+                certificate, chainCertificates, rootCertificate);
 
             if (!wrapper_unique) {
                 throwJavaException(env, "Failed to initialize native PoDoFo wrapper");
@@ -787,6 +797,102 @@ extern "C" {
         } catch (const std::exception& e) {
             throwJavaException(env, e.what());
             return JNI_FALSE;
+        }
+    }
+
+    static const char* encryptionAlgorithmName(PoDoFo::PdfEncryptionAlgorithm algorithm) {
+        switch (algorithm) {
+            case PoDoFo::PdfEncryptionAlgorithm::RC4V1: return "rc4-v1";
+            case PoDoFo::PdfEncryptionAlgorithm::RC4V2: return "rc4-v2";
+            case PoDoFo::PdfEncryptionAlgorithm::AESV2: return "aes-v2";
+            case PoDoFo::PdfEncryptionAlgorithm::AESV3R5: return "aes-v3-r5";
+            case PoDoFo::PdfEncryptionAlgorithm::AESV3R6: return "aes-v3-r6";
+            case PoDoFo::PdfEncryptionAlgorithm::None: return "none";
+        }
+        return "unknown";
+    }
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetEncryptionAlgorithm(
+        JNIEnv* env, jobject thiz, jlong handle) {
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* encrypt = doc->GetEncrypt();
+            return encrypt == nullptr ? nullptr : stringToJstring(env, encryptionAlgorithmName(encrypt->GetEncryptAlgorithm()));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return nullptr;
+        }
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetEncryptionKeyLengthBits(
+        JNIEnv* env, jobject thiz, jlong handle) {
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* encrypt = doc->GetEncrypt();
+            return encrypt == nullptr ? 0 : static_cast<jint>(encrypt->GetKeyLengthBytes() * 8);
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetEncryptionRevision(
+        JNIEnv* env, jobject thiz, jlong handle) {
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* encrypt = doc->GetEncrypt();
+            return encrypt == nullptr ? 0 : static_cast<jint>(encrypt->GetRevision());
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
+        }
+    }
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsMetadataEncrypted(
+        JNIEnv* env, jobject thiz, jlong handle) {
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* encrypt = doc->GetEncrypt();
+            return encrypt != nullptr && encrypt->IsMetadataEncrypted() ? JNI_TRUE : JNI_FALSE;
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return JNI_FALSE;
+        }
+    }
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsOwnerPasswordSet(
+        JNIEnv* env, jobject thiz, jlong handle) {
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* encrypt = doc->GetEncrypt();
+            return encrypt != nullptr && encrypt->IsOwnerPasswordSet() ? JNI_TRUE : JNI_FALSE;
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return JNI_FALSE;
+        }
+    }
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsEncryptionParsed(
+        JNIEnv* env, jobject thiz, jlong handle) {
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* encrypt = doc->GetEncrypt();
+            return encrypt != nullptr && encrypt->IsParsed() ? JNI_TRUE : JNI_FALSE;
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return JNI_FALSE;
+        }
+    }
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetEncryptionPermissions(
+        JNIEnv* env, jobject thiz, jlong handle) {
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            auto* encrypt = doc->GetEncrypt();
+            return encrypt == nullptr ? 0 : static_cast<jint>(static_cast<uint32_t>(encrypt->GetPValue()));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return 0;
         }
     }
 

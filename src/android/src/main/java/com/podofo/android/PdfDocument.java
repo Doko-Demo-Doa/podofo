@@ -436,6 +436,48 @@ public class PdfDocument implements AutoCloseable {
     return nativeIsEncrypted(nativeHandle);
   }
 
+  /** @return the encryption algorithm name, or {@code null} when unencrypted */
+  public String getEncryptionAlgorithm() {
+    checkOpen();
+    return nativeGetEncryptionAlgorithm(nativeHandle);
+  }
+
+  /** @return the encryption key length in bits, or {@code 0} when unencrypted */
+  public int getEncryptionKeyLengthBits() {
+    checkOpen();
+    return nativeGetEncryptionKeyLengthBits(nativeHandle);
+  }
+
+  /** @return the PDF security-handler revision, or {@code 0} when unencrypted */
+  public int getEncryptionRevision() {
+    checkOpen();
+    return nativeGetEncryptionRevision(nativeHandle);
+  }
+
+  /** @return whether document metadata is encrypted */
+  public boolean isMetadataEncrypted() {
+    checkOpen();
+    return nativeIsMetadataEncrypted(nativeHandle);
+  }
+
+  /** @return whether the owner password is configured */
+  public boolean isOwnerPasswordSet() {
+    checkOpen();
+    return nativeIsOwnerPasswordSet(nativeHandle);
+  }
+
+  /** @return whether the encryption dictionary was parsed from the PDF */
+  public boolean isEncryptionParsed() {
+    checkOpen();
+    return nativeIsEncryptionParsed(nativeHandle);
+  }
+
+  /** @return the raw PDF permissions bitmask, or {@code 0} when unencrypted */
+  public int getEncryptionPermissions() {
+    checkOpen();
+    return nativeGetEncryptionPermissions(nativeHandle);
+  }
+
   public String getCreator() {
     checkOpen();
     return nativeGetCreator(nativeHandle);
@@ -473,6 +515,20 @@ public class PdfDocument implements AutoCloseable {
   private native void nativeClose(long handle);
 
   private native boolean nativeIsEncrypted(long handle);
+
+  private native String nativeGetEncryptionAlgorithm(long handle);
+
+  private native int nativeGetEncryptionKeyLengthBits(long handle);
+
+  private native int nativeGetEncryptionRevision(long handle);
+
+  private native boolean nativeIsMetadataEncrypted(long handle);
+
+  private native boolean nativeIsOwnerPasswordSet(long handle);
+
+  private native boolean nativeIsEncryptionParsed(long handle);
+
+  private native int nativeGetEncryptionPermissions(long handle);
 
   private native int nativeGetPageCount(long handle);
 

@@ -33,6 +33,7 @@ public class PoDoFoWrapper implements AutoCloseable {
   private final String outputPath;
   private final String certificate;
   private final String[] chainCertificates;
+  private final String rootCertificate;
 
   /**
    * Initialize the PDF signer with required parameters
@@ -51,12 +52,36 @@ public class PoDoFoWrapper implements AutoCloseable {
   public PoDoFoWrapper(String conformanceLevel, String hashAlgorithm,
       String inputPath, String outputPath, String certificate,
       String[] chainCertificates) throws PoDoFoException {
+    this(conformanceLevel, hashAlgorithm, inputPath, outputPath, certificate,
+        chainCertificates, null);
+  }
+
+  /**
+   * Initialize the PDF signer with required parameters
+   *
+   * @param conformanceLevel  The PDF conformance level
+   * @param hashAlgorithm     The hash algorithm to use
+   * @param inputPath         Path to the input PDF file
+   * @param outputPath        Path to save the signed PDF file
+   * @param certificate       The signing certificate, base64-encoded DER (not PEM: no
+   *                          "-----BEGIN/END-----" header/footer, no line wrapping)
+   * @param chainCertificates Array of chain certificates, each base64-encoded DER (same
+   *                          format as {@code certificate})
+   * @param rootCertificate   Optional root certificate, base64-encoded DER (same format as
+   *                          {@code certificate})
+   * @throws IllegalArgumentException if any of the required parameters are null
+   * @throws PoDoFoException          if native initialization fails
+   */
+  public PoDoFoWrapper(String conformanceLevel, String hashAlgorithm,
+      String inputPath, String outputPath, String certificate,
+      String[] chainCertificates, String rootCertificate) throws PoDoFoException {
     this.conformanceLevel = conformanceLevel;
     this.hashAlgorithm = hashAlgorithm;
     this.inputPath = inputPath;
     this.outputPath = outputPath;
     this.certificate = certificate;
     this.chainCertificates = chainCertificates;
+    this.rootCertificate = rootCertificate;
 
     // Initialize native wrapper
     System.out.println("PoDoFoWrapper: Initializing PoDoFo wrapper");
@@ -67,10 +92,11 @@ public class PoDoFoWrapper implements AutoCloseable {
     System.out.println("PoDoFoWrapper: Certificate: " + (certificate != null ? certificate : "null"));
     System.out.println(
         "PoDoFoWrapper: Chain Certificates count: " + (chainCertificates != null ? chainCertificates.length : 0));
+    System.out.println("PoDoFoWrapper: Root Certificate: " + (rootCertificate != null ? rootCertificate : "null"));
 
     System.out.println("PoDoFoWrapper: Calling nativeInit");
     nativeHandle = nativeInit(conformanceLevel, hashAlgorithm, inputPath, outputPath,
-        certificate, chainCertificates);
+        certificate, chainCertificates, rootCertificate);
     System.out.println("PoDoFoWrapper: nativeInit returned handle: " + nativeHandle);
 
     if (nativeHandle == 0) {
@@ -312,7 +338,7 @@ public class PoDoFoWrapper implements AutoCloseable {
   // Native methods implemented in C++
   private native long nativeInit(String conformanceLevel, String hashAlgorithm,
       String inputPath, String outputPath,
-      String certificate, String[] chainCertificates);
+      String certificate, String[] chainCertificates, String rootCertificate);
 
   private native boolean nativeIsLoaded(long handle);
 

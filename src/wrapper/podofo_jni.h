@@ -3,6 +3,7 @@
 
 #include <jni.h>
 #include <podofo/podofo.h>
+#include <optional>
 #include <string>
 #include <vector>
 #include <memory>
@@ -24,7 +25,8 @@ public:
                                                      const std::string &inputPath,
                                                      const std::string &outputPath,
                                                      const std::string &certificate,
-                                                     const std::vector<std::string> &chainCertificates);
+                                                     const std::vector<std::string> &chainCertificates,
+                                                     const std::optional<std::string> &rootCertificate);
 
     bool isLoaded() const;
     void printState() const;
@@ -56,7 +58,7 @@ extern "C"
     JNIEXPORT jlong JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeInit(
         JNIEnv *env, jobject thiz, jstring jConformanceLevel, jstring jHashAlgorithm,
         jstring jInputPath, jstring jOutputPath, jstring jCertificate,
-        jobjectArray jChainCertificates);
+        jobjectArray jChainCertificates, jstring jRootCertificate);
 
     JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeCleanup(
         JNIEnv *env, jobject thiz, jlong nativeHandle);
@@ -133,6 +135,27 @@ extern "C"
         JNIEnv *env, jobject thiz, jlong handle);
 
     JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsEncrypted(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jstring JNICALL Java_com_podofo_android_PdfDocument_nativeGetEncryptionAlgorithm(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetEncryptionKeyLengthBits(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetEncryptionRevision(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsMetadataEncrypted(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsOwnerPasswordSet(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsEncryptionParsed(
+        JNIEnv *env, jobject thiz, jlong handle);
+
+    JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetEncryptionPermissions(
         JNIEnv *env, jobject thiz, jlong handle);
 
     JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetPageCount(
