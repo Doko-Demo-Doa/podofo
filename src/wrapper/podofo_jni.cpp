@@ -778,6 +778,18 @@ extern "C" {
         }
     }
 
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsEncrypted(
+        JNIEnv* env, jobject thiz, jlong handle) {
+
+        try {
+            auto* doc = reinterpret_cast<PoDoFo::PdfMemDocument*>(handle);
+            return doc->IsEncrypted() ? JNI_TRUE : JNI_FALSE;
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+            return JNI_FALSE;
+        }
+    }
+
     JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetPageCount(
         JNIEnv* env, jobject thiz, jlong handle) {
 

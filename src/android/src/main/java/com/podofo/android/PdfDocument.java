@@ -11,7 +11,7 @@ import android.util.Log;
  *
  * Only a slice of PoDoFo's document API is exposed here so far — see
  * SUMMARIZE.md for what's intentionally not bound yet (text extraction,
- * drawing/painting, forms, encryption, and everything else under
+ * drawing/painting, forms, and everything else under
  * src/podofo/main/ beyond PdfMemDocument/PdfPageCollection/PdfMetadata).
  */
 public class PdfDocument implements AutoCloseable {
@@ -428,6 +428,14 @@ public class PdfDocument implements AutoCloseable {
     nativeSetSubject(nativeHandle, subject);
   }
 
+  /**
+   * @return whether this document has an encryption dictionary
+   */
+  public boolean isEncrypted() {
+    checkOpen();
+    return nativeIsEncrypted(nativeHandle);
+  }
+
   public String getCreator() {
     checkOpen();
     return nativeGetCreator(nativeHandle);
@@ -463,6 +471,8 @@ public class PdfDocument implements AutoCloseable {
   private native void nativeSave(long handle, String path);
 
   private native void nativeClose(long handle);
+
+  private native boolean nativeIsEncrypted(long handle);
 
   private native int nativeGetPageCount(long handle);
 

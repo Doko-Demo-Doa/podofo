@@ -132,6 +132,9 @@ extern "C"
     JNIEXPORT void JNICALL Java_com_podofo_android_PdfDocument_nativeClose(
         JNIEnv *env, jobject thiz, jlong handle);
 
+    JNIEXPORT jboolean JNICALL Java_com_podofo_android_PdfDocument_nativeIsEncrypted(
+        JNIEnv *env, jobject thiz, jlong handle);
+
     JNIEXPORT jint JNICALL Java_com_podofo_android_PdfDocument_nativeGetPageCount(
         JNIEnv *env, jobject thiz, jlong handle);
 
