@@ -172,6 +172,7 @@ namespace PoDoFo {
         unsigned PageIndex = 0;
         Rect WidgetRect;
         std::optional<std::string> Text;
+        std::optional<std::string> FontName;
     };
 
     /**
@@ -249,7 +250,7 @@ namespace PoDoFo {
         void setSignatureLocation(const std::string& location);
         void setSignatureReason(const std::string& reason);
         void setSignatureContactInfo(const std::string& contactInfo);
-        void setVisibleSignature(unsigned pageIndex, const Rect& widgetRect, const std::optional<std::string>& text = std::nullopt);
+        void setVisibleSignature(unsigned pageIndex, const Rect& widgetRect, const std::optional<std::string>& text = std::nullopt, const std::optional<std::string>& fontName = std::nullopt);
         void clearVisibleSignature();
         /**
          * @brief Sets the timestamp token (base64 TSR) to be used in the session

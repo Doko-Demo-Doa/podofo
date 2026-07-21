@@ -183,12 +183,13 @@ public class PoDoFoWrapper implements AutoCloseable {
    * Makes the signature visible by placing its widget on a page.
    * Call before {@link #calculateHash()}.
    */
-  public void setVisibleSignature(int pageIndex, double x, double y, double width, double height, String text)
+  public void setVisibleSignature(int pageIndex, double x, double y, double width, double height, String text,
+      String fontName)
       throws PoDoFoException {
     if (nativeHandle == 0) {
       throw new PoDoFoException("Session not initialized");
     }
-    nativeSetVisibleSignature(nativeHandle, pageIndex, x, y, width, height, text);
+    nativeSetVisibleSignature(nativeHandle, pageIndex, x, y, width, height, text, fontName);
   }
 
   /**
@@ -367,7 +368,7 @@ public class PoDoFoWrapper implements AutoCloseable {
   private native void nativeSetSignatureContactInfo(long handle, String contactInfo);
 
   private native void nativeSetVisibleSignature(long handle, int pageIndex,
-      double x, double y, double width, double height, String text);
+      double x, double y, double width, double height, String text, String fontName);
 
   private native String nativeCalculateHash(long handle);
 

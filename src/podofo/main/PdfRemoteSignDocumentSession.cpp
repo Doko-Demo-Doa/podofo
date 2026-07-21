@@ -364,11 +364,11 @@ void PoDoFo::PdfRemoteSignDocumentSession::setSignatureContactInfo(const std::st
     _signatureContactInfo = contactInfo;
 }
 
-void PoDoFo::PdfRemoteSignDocumentSession::setVisibleSignature(unsigned pageIndex, const Rect& widgetRect, const std::optional<std::string>& text) {
+void PoDoFo::PdfRemoteSignDocumentSession::setVisibleSignature(unsigned pageIndex, const Rect& widgetRect, const std::optional<std::string>& text, const std::optional<std::string>& fontName) {
     if (widgetRect.Width <= 0 || widgetRect.Height <= 0) {
         throw std::invalid_argument("Visible signature rectangle width and height must be > 0");
     }
-    _visibleSignature = PdfVisibleSignatureOptions{ pageIndex, widgetRect, text };
+    _visibleSignature = PdfVisibleSignatureOptions{ pageIndex, widgetRect, text, fontName };
 }
 
 void PoDoFo::PdfRemoteSignDocumentSession::clearVisibleSignature() {
@@ -390,8 +390,11 @@ void PoDoFo::PdfRemoteSignDocumentSession::applySignatureAppearance(PdfSignature
     painter.GraphicsState.SetNonStrokingColor(PdfColor(1.0, 1.0, 1.0));
     painter.DrawRectangle(0, 0, options.WidgetRect.Width, options.WidgetRect.Height, PdfPathDrawMode::Stroke);
 
-    auto& font = _doc.GetFonts().GetStandard14Font(PdfStandard14FontType::Helvetica);
-    painter.TextState.SetFont(font, 10);
+    auto font = options.FontName ? _doc.GetFonts().SearchFont(*options.FontName) : nullptr;
+    if (font == nullptr) {
+        font = &_doc.GetFonts().GetStandard14Font(PdfStandard14FontType::Helvetica);
+    }
+    painter.TextState.SetFont(*font, 10);
     painter.GraphicsState.SetNonStrokingColor(PdfColor(0.0, 0.0, 0.0));
     painter.DrawTextMultiLine(appearanceText, 6, 6, std::max(0.0, options.WidgetRect.Width - 12), std::max(0.0, options.WidgetRect.Height - 12));
     painter.FinishDrawing();
