@@ -441,8 +441,6 @@ void PoDoFo::PdfRemoteSignDocumentSession::applySignatureAppearance(PdfSignature
     painter.GraphicsState.SetNonStrokingColor(PdfColor(0.0, 0.0, 0.0));
     painter.DrawTextMultiLine(appearanceText, padding, padding, contentWidth, contentHeight);
 
-    painter.GraphicsState.SetStrokingColor(PdfColor(0.1, 0.1, 0.1));
-    painter.DrawRectangle(0, 0, options.Placement.WidgetRect.Width, options.Placement.WidgetRect.Height, PdfPathDrawMode::Stroke);
     painter.FinishDrawing();
 
     signature.MustGetWidget().SetAppearanceStream(*xObject);
