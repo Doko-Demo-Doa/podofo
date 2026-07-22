@@ -180,6 +180,31 @@ public class PoDoFoWrapper implements AutoCloseable {
   }
 
   /**
+   * Makes the signature visible by placing a text widget on a page.
+   * Call before {@link #calculateHash()}.
+   */
+  public void setVisibleTextSignature(int pageIndex, double x, double y, double width, double height, String text,
+      String fontName) throws PoDoFoException {
+    if (nativeHandle == 0) {
+      throw new PoDoFoException("Session not initialized");
+    }
+    nativeSetVisibleTextSignature(nativeHandle, pageIndex, x, y, width, height, text, fontName);
+  }
+
+  /**
+   * Makes the signature visible by placing an image widget on a page.
+   * Call before {@link #calculateHash()}.
+   */
+  public void setVisibleImageSignature(int pageIndex, double x, double y, double width, double height,
+      String imagePath, String imageBase64, byte[] imageData, String imageFit) throws PoDoFoException {
+    if (nativeHandle == 0) {
+      throw new PoDoFoException("Session not initialized");
+    }
+    nativeSetVisibleImageSignature(nativeHandle, pageIndex, x, y, width, height, imagePath, imageBase64, imageData,
+        imageFit);
+  }
+
+  /**
    * Calculate hash for signing
    *
    * @return The hash as a string, or null if calculation failed
@@ -353,6 +378,13 @@ public class PoDoFoWrapper implements AutoCloseable {
   private native void nativeSetSignatureReason(long handle, String reason);
 
   private native void nativeSetSignatureContactInfo(long handle, String contactInfo);
+
+  private native void nativeSetVisibleTextSignature(long handle, int pageIndex,
+      double x, double y, double width, double height, String text, String fontName);
+
+  private native void nativeSetVisibleImageSignature(long handle, int pageIndex,
+      double x, double y, double width, double height, String imagePath, String imageBase64, byte[] imageData,
+      String imageFit);
 
   private native String nativeCalculateHash(long handle);
 

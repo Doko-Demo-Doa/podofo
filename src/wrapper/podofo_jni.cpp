@@ -97,6 +97,28 @@ void PoDoFoWrapper::setSignatureContactInfo(const std::string& contactInfo) {
     nativeSession->setSignatureContactInfo(contactInfo);
 }
 
+void PoDoFoWrapper::setVisibleTextSignature(unsigned pageIndex, double x, double y, double width, double height,
+    const std::optional<std::string>& text,
+    const std::optional<std::string>& fontName) {
+    if (!nativeSession) {
+        throw std::runtime_error("PoDoFo session is not initialized.");
+    }
+
+    nativeSession->setVisibleTextSignature(pageIndex, PoDoFo::Rect(x, y, width, height), text, fontName);
+}
+
+void PoDoFoWrapper::setVisibleImageSignature(unsigned pageIndex, double x, double y, double width, double height,
+    const std::optional<std::string>& imagePath,
+    const std::optional<std::string>& imageBase64,
+    const std::optional<PoDoFo::charbuff>& imageData,
+    const std::optional<std::string>& imageFit) {
+    if (!nativeSession) {
+        throw std::runtime_error("PoDoFo session is not initialized.");
+    }
+
+    nativeSession->setVisibleImageSignature(pageIndex, PoDoFo::Rect(x, y, width, height), imagePath, imageBase64, imageData, imageFit);
+}
+
 std::string PoDoFoWrapper::calculateHash() {
     if (!nativeSession) {
         throw std::runtime_error("PoDoFo session is not initialized.");
@@ -259,6 +281,20 @@ std::optional<std::string> optionalJstringToString(JNIEnv* env, jstring jStr) {
         return std::nullopt;
     }
     return jstringToString(env, jStr);
+}
+
+std::optional<PoDoFo::charbuff> optionalJbyteArrayToCharbuff(JNIEnv* env, jbyteArray jBytes) {
+    if (!jBytes) {
+        return std::nullopt;
+    }
+
+    const auto length = env->GetArrayLength(jBytes);
+    PoDoFo::charbuff buffer;
+    buffer.resize(static_cast<size_t>(length));
+    if (length > 0) {
+        env->GetByteArrayRegion(jBytes, 0, length, reinterpret_cast<jbyte*>(buffer.data()));
+    }
+    return buffer;
 }
 
 std::vector<std::string> jstringArrayToVector(JNIEnv* env, jobjectArray jArray) {
@@ -456,6 +492,64 @@ extern "C" {
         try {
             auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
             wrapper->setSignatureContactInfo(jstringToString(env, jContactInfo));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetVisibleTextSignature(
+        JNIEnv* env, jobject thiz, jlong nativeHandle, jint pageIndex,
+        jdouble x, jdouble y, jdouble width, jdouble height, jstring jText, jstring jFontName) {
+
+        if (!nativeHandle) {
+            throwJavaException(env, "Session not initialized");
+            return;
+        }
+
+        try {
+            if (pageIndex < 0) {
+                throw std::invalid_argument("Visible signature pageIndex must be >= 0");
+            }
+            auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
+            wrapper->setVisibleTextSignature(
+                static_cast<unsigned>(pageIndex),
+                x,
+                y,
+                width,
+                height,
+                optionalJstringToString(env, jText),
+                optionalJstringToString(env, jFontName));
+        } catch (const std::exception& e) {
+            throwJavaException(env, e.what());
+        }
+    }
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetVisibleImageSignature(
+        JNIEnv* env, jobject thiz, jlong nativeHandle, jint pageIndex,
+        jdouble x, jdouble y, jdouble width, jdouble height,
+        jstring jImagePath, jstring jImageBase64,
+        jbyteArray jImageData, jstring jImageFit) {
+
+        if (!nativeHandle) {
+            throwJavaException(env, "Session not initialized");
+            return;
+        }
+
+        try {
+            if (pageIndex < 0) {
+                throw std::invalid_argument("Visible signature pageIndex must be >= 0");
+            }
+            auto* wrapper = reinterpret_cast<PoDoFoWrapper*>(nativeHandle);
+            wrapper->setVisibleImageSignature(
+                static_cast<unsigned>(pageIndex),
+                x,
+                y,
+                width,
+                height,
+                optionalJstringToString(env, jImagePath),
+                optionalJstringToString(env, jImageBase64),
+                optionalJbyteArrayToCharbuff(env, jImageData),
+                optionalJstringToString(env, jImageFit));
         } catch (const std::exception& e) {
             throwJavaException(env, e.what());
         }

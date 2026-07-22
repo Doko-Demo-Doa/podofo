@@ -19,6 +19,8 @@
 #include <openssl/x509v3.h>
 #include <openssl/ocsp.h>
 #include <openssl/err.h>
+#include <algorithm>
+#include <cctype>
 #include <iomanip>
 #include <cstring>
 
@@ -101,10 +103,25 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::beginSigning() {
         auto& acroForm = _doc.GetOrCreateAcroForm();
         acroForm.GetDictionary().AddKey("SigFlags"_n, (int64_t)3);
 
-        auto& page = _doc.GetPages().GetPageAt(0);
-        auto& field = page.CreateField("Signature", PoDoFo::PdfFieldType::Signature, PoDoFo::Rect(0, 0, 0, 0));
+        const auto visiblePageIndex = _visibleSignature
+            ? std::visit([](const auto& options) { return options.Placement.PageIndex; }, *_visibleSignature)
+            : 0;
+        const auto visibleWidgetRect = _visibleSignature
+            ? std::visit([](const auto& options) { return options.Placement.WidgetRect; }, *_visibleSignature)
+            : PoDoFo::Rect(0, 0, 0, 0);
+
+        auto& page = _doc.GetPages().GetPageAt(visiblePageIndex);
+        auto& field = page.CreateField(
+            "Signature",
+            PoDoFo::PdfFieldType::Signature,
+            visibleWidgetRect);
         auto& signature = static_cast<PoDoFo::PdfSignature&>(field);
-        signature.MustGetWidget().SetFlags(PoDoFo::PdfAnnotationFlags::Invisible | PoDoFo::PdfAnnotationFlags::Hidden);
+        if (_visibleSignature) {
+            std::visit([&](const auto& options) { applySignatureAppearance(signature, options); }, *_visibleSignature);
+        }
+        else {
+            signature.MustGetWidget().SetFlags(PoDoFo::PdfAnnotationFlags::Invisible | PoDoFo::PdfAnnotationFlags::Hidden);
+        }
         signature.SetSignatureDate(PoDoFo::PdfDate::LocalNow());
         if (_signerName)
             signature.SetSignerName(PoDoFo::PdfString(*_signerName));
@@ -351,6 +368,159 @@ void PoDoFo::PdfRemoteSignDocumentSession::setSignatureReason(const std::string&
 
 void PoDoFo::PdfRemoteSignDocumentSession::setSignatureContactInfo(const std::string& contactInfo) {
     _signatureContactInfo = contactInfo;
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::setVisibleTextSignature(unsigned pageIndex, const Rect& widgetRect,
+    const std::optional<std::string>& text,
+    const std::optional<std::string>& fontName) {
+    if (widgetRect.Width <= 0 || widgetRect.Height <= 0) {
+        throw std::invalid_argument("Visible text signature rectangle width and height must be > 0");
+    }
+
+    _visibleSignature = PdfVisibleTextSignatureOptions{
+        PdfVisibleSignaturePlacement{ pageIndex, widgetRect },
+        text,
+        fontName,
+    };
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::setVisibleImageSignature(unsigned pageIndex, const Rect& widgetRect,
+    const std::optional<std::string>& imagePath,
+    const std::optional<std::string>& imageBase64,
+    const std::optional<charbuff>& imageData,
+    const std::optional<std::string>& imageFit) {
+    if (widgetRect.Width <= 0 || widgetRect.Height <= 0) {
+        throw std::invalid_argument("Visible image signature rectangle width and height must be > 0");
+    }
+
+    const auto imageSourceCount = static_cast<int>(imagePath.has_value())
+        + static_cast<int>(imageBase64.has_value())
+        + static_cast<int>(imageData.has_value());
+    if (imageSourceCount != 1) {
+        throw std::invalid_argument("Visible image signature must use exactly one of path, base64, or bytes");
+    }
+    const auto resolvedImageFit = imageFit.value_or("contain");
+    if (resolvedImageFit != "contain" && resolvedImageFit != "stretch") {
+        throw std::invalid_argument("Unsupported visible image signature fit: " + resolvedImageFit);
+    }
+
+    _visibleSignature = PdfVisibleImageSignatureOptions{
+        PdfVisibleSignaturePlacement{ pageIndex, widgetRect },
+        imagePath,
+        imageBase64,
+        imageData,
+        resolvedImageFit,
+    };
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::clearVisibleSignature() {
+    _visibleSignature.reset();
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::applySignatureAppearance(PdfSignature& signature, const PdfVisibleTextSignatureOptions& options) {
+    const auto pageCount = _doc.GetPages().GetCount();
+    if (options.Placement.PageIndex >= pageCount) {
+        throw std::out_of_range("Visible signature pageIndex is outside the document page range");
+    }
+
+    auto xObject = _doc.CreateXObjectForm(Rect(0, 0, options.Placement.WidgetRect.Width, options.Placement.WidgetRect.Height));
+
+    PdfPainter painter;
+    painter.SetCanvas(*xObject);
+
+    const double padding = 6;
+    const double contentWidth = std::max(0.0, options.Placement.WidgetRect.Width - (padding * 2));
+    const double contentHeight = std::max(0.0, options.Placement.WidgetRect.Height - (padding * 2));
+
+    const auto appearanceText = options.Text.value_or("Digitally signed");
+    auto font = options.FontName ? _doc.GetFonts().SearchFont(*options.FontName) : nullptr;
+    if (font == nullptr) {
+        font = &_doc.GetFonts().GetStandard14Font(PdfStandard14FontType::Helvetica);
+    }
+    painter.TextState.SetFont(*font, 10);
+    painter.GraphicsState.SetNonStrokingColor(PdfColor(0.0, 0.0, 0.0));
+    painter.DrawTextMultiLine(appearanceText, padding, padding, contentWidth, contentHeight);
+
+    painter.GraphicsState.SetStrokingColor(PdfColor(0.1, 0.1, 0.1));
+    painter.DrawRectangle(0, 0, options.Placement.WidgetRect.Width, options.Placement.WidgetRect.Height, PdfPathDrawMode::Stroke);
+    painter.FinishDrawing();
+
+    signature.MustGetWidget().SetAppearanceStream(*xObject);
+}
+
+void PoDoFo::PdfRemoteSignDocumentSession::applySignatureAppearance(PdfSignature& signature, const PdfVisibleImageSignatureOptions& options) {
+    const auto pageCount = _doc.GetPages().GetCount();
+    if (options.Placement.PageIndex >= pageCount) {
+        throw std::out_of_range("Visible signature pageIndex is outside the document page range");
+    }
+
+    auto xObject = _doc.CreateXObjectForm(Rect(0, 0, options.Placement.WidgetRect.Width, options.Placement.WidgetRect.Height));
+
+    PdfPainter painter;
+    painter.SetCanvas(*xObject);
+
+    const double padding = 6;
+    const double contentWidth = std::max(0.0, options.Placement.WidgetRect.Width - (padding * 2));
+    const double contentHeight = std::max(0.0, options.Placement.WidgetRect.Height - (padding * 2));
+
+    std::unique_ptr<PdfImage> image;
+    if (options.ImagePath) {
+        image = _doc.CreateImage();
+        image->Load(*options.ImagePath);
+    }
+    else if (options.ImageBase64) {
+        auto cleanBase64 = *options.ImageBase64;
+        const auto comma = cleanBase64.find(',');
+        if (cleanBase64.rfind("data:", 0) == 0 && comma != std::string::npos) {
+            cleanBase64 = cleanBase64.substr(comma + 1);
+        }
+        cleanBase64.erase(std::remove_if(cleanBase64.begin(), cleanBase64.end(), [](unsigned char c) {
+            return std::isspace(c) != 0;
+        }), cleanBase64.end());
+
+        auto decoded = ConvertBase64PEMtoDER(cleanBase64, std::nullopt);
+        charbuff buffer;
+        buffer.assign(reinterpret_cast<const char*>(decoded.data()), decoded.size());
+        image = _doc.CreateImage();
+        image->LoadFromBuffer(bufferview(buffer.data(), buffer.size()));
+    }
+    else if (options.ImageData) {
+        image = _doc.CreateImage();
+        image->LoadFromBuffer(bufferview(options.ImageData->data(), options.ImageData->size()));
+    }
+
+    if (!image) {
+        throw std::runtime_error("Visible image signature has no image source");
+    }
+
+    if (contentWidth > 0 && contentHeight > 0) {
+        const auto imageWidth = static_cast<double>(image->GetWidth());
+        const auto imageHeight = static_cast<double>(image->GetHeight());
+        if (imageWidth <= 0 || imageHeight <= 0) {
+            throw std::runtime_error("Visible signature image has invalid dimensions");
+        }
+
+        double drawX = padding;
+        double drawY = padding;
+        double drawWidth = contentWidth;
+        double drawHeight = contentHeight;
+
+        if (options.ImageFit == "contain") {
+            const auto scale = std::min(contentWidth / imageWidth, contentHeight / imageHeight);
+            drawWidth = imageWidth * scale;
+            drawHeight = imageHeight * scale;
+            drawX += (contentWidth - drawWidth) / 2;
+            drawY += (contentHeight - drawHeight) / 2;
+        }
+
+        painter.DrawImage(*image, drawX, drawY, drawWidth / imageWidth, drawHeight / imageHeight);
+    }
+
+    painter.GraphicsState.SetStrokingColor(PdfColor(0.1, 0.1, 0.1));
+    painter.DrawRectangle(0, 0, options.Placement.WidgetRect.Width, options.Placement.WidgetRect.Height, PdfPathDrawMode::Stroke);
+    painter.FinishDrawing();
+
+    signature.MustGetWidget().SetAppearanceStream(*xObject);
 }
 
 void PoDoFo::PdfRemoteSignDocumentSession::setTimestampToken(const std::string& responseTsrBase64) {

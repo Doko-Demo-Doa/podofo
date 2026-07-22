@@ -35,6 +35,14 @@ public:
     void setSignatureLocation(const std::string &location);
     void setSignatureReason(const std::string &reason);
     void setSignatureContactInfo(const std::string &contactInfo);
+    void setVisibleTextSignature(unsigned pageIndex, double x, double y, double width, double height,
+                                 const std::optional<std::string> &text,
+                                 const std::optional<std::string> &fontName);
+    void setVisibleImageSignature(unsigned pageIndex, double x, double y, double width, double height,
+                                  const std::optional<std::string> &imagePath,
+                                  const std::optional<std::string> &imageBase64,
+                                  const std::optional<PoDoFo::charbuff> &imageData,
+                                  const std::optional<std::string> &imageFit);
     std::string calculateHash();
     void finalizeSigningWithSignedHash(const std::string &signedHash, const std::string &tsr, const std::optional<PoDoFo::ValidationData> &validationData);
     std::string beginSigningLTA();
@@ -83,6 +91,16 @@ extern "C"
 
     JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetSignatureContactInfo(
         JNIEnv *env, jobject thiz, jlong nativeHandle, jstring jContactInfo);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetVisibleTextSignature(
+        JNIEnv *env, jobject thiz, jlong nativeHandle, jint pageIndex,
+        jdouble x, jdouble y, jdouble width, jdouble height, jstring jText, jstring jFontName);
+
+    JNIEXPORT void JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeSetVisibleImageSignature(
+        JNIEnv *env, jobject thiz, jlong nativeHandle, jint pageIndex,
+        jdouble x, jdouble y, jdouble width, jdouble height,
+        jstring jImagePath, jstring jImageBase64,
+        jbyteArray jImageData, jstring jImageFit);
 
     JNIEXPORT jstring JNICALL Java_com_podofo_android_PoDoFoWrapper_nativeCalculateHash(
         JNIEnv *env, jobject thiz, jlong nativeHandle);
