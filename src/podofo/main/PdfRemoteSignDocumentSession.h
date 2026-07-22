@@ -34,6 +34,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <variant>
 #include <regex>
 #include <thread>
 #include <filesystem>
@@ -166,14 +167,34 @@ namespace PoDoFo {
     };
 
     /**
-     * @brief Optional visible signature widget placement and appearance text.
+     * @brief Shared visible signature widget placement.
      */
-    struct PODOFO_API PdfVisibleSignatureOptions final {
+    struct PODOFO_API PdfVisibleSignaturePlacement final {
         unsigned PageIndex = 0;
         Rect WidgetRect;
+    };
+
+    /**
+     * @brief Visible signature appearance rendered as text.
+     */
+    struct PODOFO_API PdfVisibleTextSignatureOptions final {
+        PdfVisibleSignaturePlacement Placement;
         std::optional<std::string> Text;
         std::optional<std::string> FontName;
     };
+
+    /**
+     * @brief Visible signature appearance rendered as an image.
+     */
+    struct PODOFO_API PdfVisibleImageSignatureOptions final {
+        PdfVisibleSignaturePlacement Placement;
+        std::optional<std::string> ImagePath;
+        std::optional<std::string> ImageBase64;
+        std::optional<charbuff> ImageData;
+        std::string ImageFit = "contain";
+    };
+
+    using PdfVisibleSignatureOptions = std::variant<PdfVisibleTextSignatureOptions, PdfVisibleImageSignatureOptions>;
 
     /**
      * @brief Represents a single PDF remote signing session.
@@ -250,7 +271,14 @@ namespace PoDoFo {
         void setSignatureLocation(const std::string& location);
         void setSignatureReason(const std::string& reason);
         void setSignatureContactInfo(const std::string& contactInfo);
-        void setVisibleSignature(unsigned pageIndex, const Rect& widgetRect, const std::optional<std::string>& text = std::nullopt, const std::optional<std::string>& fontName = std::nullopt);
+        void setVisibleTextSignature(unsigned pageIndex, const Rect& widgetRect,
+            const std::optional<std::string>& text = std::nullopt,
+            const std::optional<std::string>& fontName = std::nullopt);
+        void setVisibleImageSignature(unsigned pageIndex, const Rect& widgetRect,
+            const std::optional<std::string>& imagePath = std::nullopt,
+            const std::optional<std::string>& imageBase64 = std::nullopt,
+            const std::optional<charbuff>& imageData = std::nullopt,
+            const std::optional<std::string>& imageFit = std::nullopt);
         void clearVisibleSignature();
         /**
          * @brief Sets the timestamp token (base64 TSR) to be used in the session
@@ -328,7 +356,8 @@ namespace PoDoFo {
          * @brief Create or update the DSS dictionary in the document with provided artifacts.
          */
         void createOrUpdateDSSCatalog(PdfMemDocument& doc, const ValidationData& validationData);
-        void applySignatureAppearance(PdfSignature& signature, const PdfVisibleSignatureOptions& options);
+        void applySignatureAppearance(PdfSignature& signature, const PdfVisibleTextSignatureOptions& options);
+        void applySignatureAppearance(PdfSignature& signature, const PdfVisibleImageSignatureOptions& options);
         /**
          * @brief Creates a stream object for a certificate
          */

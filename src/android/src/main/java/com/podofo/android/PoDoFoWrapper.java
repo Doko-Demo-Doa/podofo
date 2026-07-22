@@ -180,16 +180,28 @@ public class PoDoFoWrapper implements AutoCloseable {
   }
 
   /**
-   * Makes the signature visible by placing its widget on a page.
+   * Makes the signature visible by placing a text widget on a page.
    * Call before {@link #calculateHash()}.
    */
-  public void setVisibleSignature(int pageIndex, double x, double y, double width, double height, String text,
-      String fontName)
-      throws PoDoFoException {
+  public void setVisibleTextSignature(int pageIndex, double x, double y, double width, double height, String text,
+      String fontName) throws PoDoFoException {
     if (nativeHandle == 0) {
       throw new PoDoFoException("Session not initialized");
     }
-    nativeSetVisibleSignature(nativeHandle, pageIndex, x, y, width, height, text, fontName);
+    nativeSetVisibleTextSignature(nativeHandle, pageIndex, x, y, width, height, text, fontName);
+  }
+
+  /**
+   * Makes the signature visible by placing an image widget on a page.
+   * Call before {@link #calculateHash()}.
+   */
+  public void setVisibleImageSignature(int pageIndex, double x, double y, double width, double height,
+      String imagePath, String imageBase64, byte[] imageData, String imageFit) throws PoDoFoException {
+    if (nativeHandle == 0) {
+      throw new PoDoFoException("Session not initialized");
+    }
+    nativeSetVisibleImageSignature(nativeHandle, pageIndex, x, y, width, height, imagePath, imageBase64, imageData,
+        imageFit);
   }
 
   /**
@@ -367,8 +379,12 @@ public class PoDoFoWrapper implements AutoCloseable {
 
   private native void nativeSetSignatureContactInfo(long handle, String contactInfo);
 
-  private native void nativeSetVisibleSignature(long handle, int pageIndex,
+  private native void nativeSetVisibleTextSignature(long handle, int pageIndex,
       double x, double y, double width, double height, String text, String fontName);
+
+  private native void nativeSetVisibleImageSignature(long handle, int pageIndex,
+      double x, double y, double width, double height, String imagePath, String imageBase64, byte[] imageData,
+      String imageFit);
 
   private native String nativeCalculateHash(long handle);
 
