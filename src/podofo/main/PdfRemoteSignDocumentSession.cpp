@@ -287,6 +287,9 @@ std::string PoDoFo::PdfRemoteSignDocumentSession::ToBase64(const PoDoFo::charbuf
 }
 
 PoDoFo::charbuff PoDoFo::PdfRemoteSignDocumentSession::ConvertDSSHashToSignedHash(const std::string& DSSHash) {
+    if (DSSHash.empty())
+        return {};
+
     BIO* raw_b64 = BIO_new(BIO_f_base64()); BIO_set_flags(raw_b64, BIO_FLAGS_BASE64_NO_NL);
     BIO* raw_mem = BIO_new_mem_buf(DSSHash.data(), static_cast<int>(DSSHash.size()));
     BIO* raw_chain = BIO_push(raw_b64, raw_mem);
