@@ -8,8 +8,8 @@ let package = Package(
     targets: [
         .binaryTarget(
             name: "PoDoFo",
-            url: "https://github.com/Doko-Demo-Doa/podofo/releases/download/v0.0.16/PoDoFo-0.0.16.xcframework.zip",
-            checksum: "8fac3d72eb2e5f16c1d9b4c4a525a14a7bd53df445ee22c4f9c976808334b0bc"
+            url: "https://github.com/Doko-Demo-Doa/podofo/releases/download/v0.0.17/PoDoFo-0.0.17.xcframework.zip",
+            checksum: "87a3e037b8537f7665ab47208a32c7ddc223cf9710f66fe61a2d5827eed6d756"
         )
     ]
 )
