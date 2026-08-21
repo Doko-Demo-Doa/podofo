@@ -18,10 +18,11 @@ using namespace PoDoFo;
 static void serializeCmsTo(charbuff& buff, CMS_ContentInfo* info);
 static void addAttribute(CMS_SignerInfo* si, int(*addAttributeFun)(CMS_SignerInfo*, const char*, int, const void*, int),
     const string_view& nid, const bufferview& attr, bool octet);
+static string getTimeString(const ASN1_TIME* time);
 
 CmsContext::CmsContext() :
     m_status(CmsContextStatus::Uninitialized),
-    m_encryption(PdfSignatureEncryption::Unknown),
+    m_signingAlgorithm(PdfSigningAlgorithm::Unknown),
     m_cert(nullptr),
     m_cms(nullptr),
     m_signer(nullptr),
@@ -89,15 +90,42 @@ void CmsContext::ComputeHashToSign(charbuff& hashToSign)
     // but we can't do that since in OpenSSL 1.1 there's not an
     // easy way to plug an external encryption so we do it manually
     ssl::ComputeHashToSign(m_signer, m_databio, m_parameters.DoWrapDigest, hashToSign);
+
+    // NOTE: ssl::ComputeHashToSign() can't be called twice, as it adds
+    // signed attributes to the signer info, so cache the result
+    m_hashToSign = hashToSign;
     m_status = CmsContextStatus::ComputedHash;
 }
 
-void CmsContext::ComputeSignature(const bufferview& signedHash, charbuff& signature)
+void CmsContext::ComputeSignature(const bufferview& signedHash, charbuff& signature, bool verify)
 {
     if (m_status != CmsContextStatus::ComputedHash)
     {
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InternalLogic,
             "The signature can't be computed at this moment");
+    }
+
+    if (verify)
+    {
+        if (m_hashToSign.size() == 0)
+        {
+            // NOTE: The hash to sign is missing in dumps produced by previous versions
+            PoDoFo::LogMessage(PdfLogSeverity::Warning, "The context has no cached hash to sign: "
+                "the supplied signed hash will not be verified");
+        }
+        else
+        {
+            auto pubkey = X509_get0_pubkey(m_cert);
+            if (pubkey == nullptr)
+                PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidHandle, "Unexpected missing public key");
+
+            if (!ssl::VerifySignedHash(signedHash, m_hashToSign, pubkey,
+                m_parameters.Hashing, m_parameters.DoWrapDigest))
+            {
+                PODOFO_RAISE_ERROR_INFO(PdfErrorCode::SignatureVerificationError,
+                    "The supplied signed hash doesn't verify against the hash to sign");
+            }
+        }
     }
 
     auto buf = (unsigned char*)OPENSSL_malloc(signedHash.size());
@@ -112,6 +140,27 @@ void CmsContext::ComputeSignature(const bufferview& signedHash, charbuff& signat
 
     serializeCmsTo(signature, m_cms);
     m_status = CmsContextStatus::ComputedSignature;
+}
+
+void CmsContext::ValidateSigningDate(const chrono::seconds& date) const
+{
+    PODOFO_INVARIANT(m_cert != nullptr);
+    auto time = (time_t)date.count();
+    auto notBefore = X509_get0_notBefore(m_cert);
+    auto notAfter = X509_get0_notAfter(m_cert);
+    int cmpBefore = X509_cmp_time(notBefore, &time);
+    int cmpAfter = X509_cmp_time(notAfter, &time);
+    // NOTE: X509_cmp_time() returns 0 when the certificate time can't be parsed
+    if (cmpBefore == 0 || cmpAfter == 0)
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::OpenSSLError, "Unreadable certificate validity period");
+
+    if (cmpBefore > 0 || cmpAfter < 0)
+    {
+        unique_ptr<ASN1_TIME, decltype(&ASN1_TIME_free)> signingTime(X509_time_adj(nullptr, 0, &time), ASN1_TIME_free);
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::SignatureVerificationError,
+            "The signature date {} is outside the certificate validity period {} - {}",
+            getTimeString(signingTime.get()), getTimeString(notBefore), getTimeString(notAfter));
+    }
 }
 
 void CmsContext::AddAttribute(const string_view& nid, const bufferview& attr, bool signedAttr, bool asOctetString)
@@ -199,12 +248,16 @@ void CmsContext::Dump(xmlNodePtr ctxElem, string& temp)
     if (xmlNewChild(parametersElem, nullptr, XMLCHAR "SigningTimeUTC", XMLCHAR temp.data()) == nullptr)
         goto SerializationFailed;
 
-    if (xmlNewChild(ctxElem, nullptr, XMLCHAR "Encryption", XMLCHAR PoDoFo::ToString(m_encryption).data()) == nullptr)
+    // NOTE: The element name is kept as it was for compatibility with dumps produced by previous versions
+    if (xmlNewChild(ctxElem, nullptr, XMLCHAR "Encryption", XMLCHAR PoDoFo::ToString(m_signingAlgorithm).data()) == nullptr)
         goto SerializationFailed;
 
     utls::WriteHexStringTo(temp, m_certHash);
-    auto certificateElem = xmlNewChild(ctxElem, nullptr, XMLCHAR "CertHash", XMLCHAR temp.data());
-    if (certificateElem == nullptr)
+    if (xmlNewChild(ctxElem, nullptr, XMLCHAR "CertHash", XMLCHAR temp.data()) == nullptr)
+        goto SerializationFailed;
+
+    utls::WriteHexStringTo(temp, m_hashToSign);
+    if (xmlNewChild(ctxElem, nullptr, XMLCHAR "HashToSign", XMLCHAR temp.data()) == nullptr)
         goto SerializationFailed;
 }
 
@@ -291,12 +344,17 @@ void CmsContext::Restore(xmlNodePtr ctxElem, charbuff& temp)
     node = utls::FindChildElement(ctxElem, "Encryption");
     if (node == nullptr || node->children == nullptr || node->children->content == nullptr)
         goto DeserializationFailed;
-    m_encryption = PoDoFo::ConvertTo<PdfSignatureEncryption>((const char*)node->children->content);
+    m_signingAlgorithm = PoDoFo::ConvertTo<PdfSigningAlgorithm>((const char*)node->children->content);
 
     node = utls::FindChildElement(ctxElem, "CertHash");
     if (node == nullptr || node->children == nullptr || node->children->content == nullptr)
         goto DeserializationFailed;
     utls::DecodeHexStringTo(m_certHash, (const char*)node->children->content);
+
+    // NOTE: This element may be missing in dumps produced by previous versions
+    node = utls::FindChildElement(ctxElem, "HashToSign");
+    if (node != nullptr && node->children != nullptr && node->children->content != nullptr)
+        utls::DecodeHexStringTo(m_hashToSign, (const char*)node->children->content);
 }
 
 unsigned CmsContext::GetSignedHashSize() const
@@ -335,7 +393,7 @@ void CmsContext::loadX509Certificate(const bufferview& cert)
     if (pubkey == nullptr)
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::OpenSSLError, "Invalid public key");
 
-    m_encryption = ssl::GetSignatureEncryption(pubkey);
+    m_signingAlgorithm = ssl::GetSigningAlgorithm(pubkey);
 }
 
 void CmsContext::computeCertificateHash()
@@ -365,6 +423,8 @@ void CmsContext::computeCertificateHash()
 
 void CmsContext::clear()
 {
+    m_hashToSign.clear();
+
     if (m_cert != nullptr)
     {
         X509_free(m_cert);
@@ -514,4 +574,18 @@ void addAttribute(CMS_SignerInfo* si, int(*addAttributeFun)(CMS_SignerInfo*, con
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::OpenSSLError,
             "Unable to insert an attribute to the signer");
     }
+}
+
+string getTimeString(const ASN1_TIME* time)
+{
+    unique_ptr<BIO, decltype(&BIO_free)> bio(BIO_new(BIO_s_mem()), BIO_free);
+    if (bio == nullptr)
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::OutOfMemory, "BIO_new");
+
+    if (time == nullptr || ASN1_TIME_print(bio.get(), time) == 0)
+        return "(unreadable)";
+
+    char* data;
+    size_t length = (size_t)BIO_get_mem_data(bio.get(), &data);
+    return string(data, length);
 }

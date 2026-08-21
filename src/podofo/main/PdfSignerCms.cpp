@@ -41,6 +41,18 @@ PdfSignerCms::PdfSignerCms() :
 {
 }
 
+void PdfSignerCms::ValidateSignatureDate(const nullable<PdfDate>& date)
+{
+    if (!date.has_value())
+    {
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::SignatureVerificationError,
+            "A signature date is required to validate the certificate validity period");
+    }
+
+    ensureContextInitialized();
+    m_cmsContext->ValidateSigningDate(date->GetSecondsFromEpoch());
+}
+
 void PdfSignerCms::AppendData(const bufferview& data)
 {
     ensureContextInitialized();
@@ -71,7 +83,8 @@ void PdfSignerCms::ComputeSignature(charbuff& contents, bool dryrun)
     if (m_parameters.SignedHashHandler != nullptr)
         m_parameters.SignedHashHandler(m_encryptedHash, dryrun);
 
-    m_cmsContext->ComputeSignature(m_encryptedHash, contents);
+    // NOTE: On dry runs the signed hash may be just a fake buffer with the expected size
+    m_cmsContext->ComputeSignature(m_encryptedHash, contents, !dryrun && shouldVerify());
     if (dryrun)
         tryEnlargeSignatureContents(contents);
 }
@@ -94,12 +107,12 @@ void PdfSignerCms::ComputeSignatureDeferred(const bufferview& processedResult, c
         charbuff fakeresult;
         m_cmsContext->ComputeHashToSign(fakeresult);
         fakeresult.resize(m_cmsContext->GetSignedHashSize());
-        m_cmsContext->ComputeSignature(fakeresult, contents);
+        m_cmsContext->ComputeSignature(fakeresult, contents, false);
         tryEnlargeSignatureContents(contents);
     }
     else
     {
-        m_cmsContext->ComputeSignature(processedResult, contents);
+        m_cmsContext->ComputeSignature(processedResult, contents, shouldVerify());
     }
 }
 
@@ -399,6 +412,13 @@ void PdfSignerCms::resetContext()
         m_cmsContext->AddCertificate(chainCert);
 }
 
+bool PdfSignerCms::shouldVerify() const
+{
+    // NOTE: The signed hash is cross-checked only when it's supplied externally
+    return m_privKey == nullptr
+        && (m_parameters.Flags & PdfSignerCmsFlags::SkipVerification) == PdfSignerCmsFlags::None;
+}
+
 void PdfSignerCms::doSign(const bufferview& input, charbuff& output)
 {
     PODOFO_ASSERT(m_privKey != nullptr);
@@ -409,7 +429,7 @@ void PdfSignerCms::doSign(const bufferview& input, charbuff& output)
 
 void PdfSignerCms::tryEnlargeSignatureContents(charbuff& contents)
 {
-    if (m_cmsContext->GetEncryption() == PdfSignatureEncryption::ECDSA)
+    if (m_cmsContext->GetSigningAlgorithm() == PdfSigningAlgorithm::ECDSA)
     {
         // Unconditionally account for 2 slack bytes due to random nature of ECDSA
         contents.resize(contents.size() + 2 + m_reservedSize);

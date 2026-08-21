@@ -43,7 +43,10 @@ namespace PoDoFo
         void Reset(const bufferview& cert, const CmsContextParams& parameters);
         void AppendData(const bufferview& data);
         void ComputeHashToSign(charbuff& hashToSign);
-        void ComputeSignature(const bufferview& signedHash, charbuff& signature);
+        /// @param verify cross-check the supplied signed hash against the cached hash to sign
+        void ComputeSignature(const bufferview& signedHash, charbuff& signature, bool verify);
+        /// Validate the given date is within the certificate validity period
+        void ValidateSigningDate(const std::chrono::seconds& date) const;
         void AddAttribute(const std::string_view& nid, const bufferview& attr, bool signedAttr, bool octetString);
         /// Add an extra X.509 certificate (DER or PEM) to the CMS "certificates" collection,
         /// without making it a signer (eg. to embed the intermediate/chain certificates)
@@ -52,7 +55,7 @@ namespace PoDoFo
         void Restore(xmlNodePtr elem, charbuff& temp);
         unsigned GetSignedHashSize() const;
     public:
-        PdfSignatureEncryption GetEncryption() const { return m_encryption; }
+        PdfSigningAlgorithm GetSigningAlgorithm() const { return m_signingAlgorithm; }
     private:
         void loadX509Certificate(const bufferview& cert);
         void computeCertificateHash();
@@ -76,9 +79,11 @@ namespace PoDoFo
     private:
         CmsContextStatus m_status;
         CmsContextParams m_parameters;
-        PdfSignatureEncryption m_encryption;
+        PdfSigningAlgorithm m_signingAlgorithm;
         struct x509_st* m_cert;
         charbuff m_certHash;
+        // Cached hash to sign, used to verify the supplied signed hash
+        charbuff m_hashToSign;
         struct CMS_ContentInfo_st* m_cms;
         struct CMS_SignerInfo_st* m_signer;
         struct bio_st* m_databio;

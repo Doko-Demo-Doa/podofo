@@ -3,9 +3,10 @@
 - `PdfInfo`: Removed the public constructors: accordingly to the 1.x API conventions
 they were not intended to be part of it. Use `PdfInfo::TryCreateFromObject` to
 parse a `PdfInfo` from an object
-- `PdfSignatureEncryption`: The values of the enums changed in a ABI incompatible
-way. This enum has currently no use in the public API, other than setting a
-deprecated and unused field in `PdfSignerCmsParams`
+- `PdfSignatureEncryption`: Deprecated in favor of `PdfSigningAlgorithm`, which
+also enumerates DSA and the PQC algorithms. `PdfSignatureEncryption` had no use
+in the public API, other than setting a deprecated and unused field in
+`PdfSignerCmsParams`
 - Deprecated enum values with typos: `PdfIdentityOrientation::Unkwnown`,
 `PdfAuthResult::Unkwnon`
 - `PdfFreeFormMeshShadingDefinition`, `PdfLatticeFormMeshShadingDefinition`,
@@ -15,6 +16,16 @@ unsigned to unsigned char. This was done for consistency in a part of the API
 which is new and has no known users, should cause no issue
 - `PdChoiceField`: Changed `GetItemDisplayText` parameter index type from int
 to unsigned for consistency. Should cause limited issues
+- `basecompat.h`: Removed the definition of the unprefixed `DEBUG` macro, which was
+set when `_DEBUG` is, that is when building against the MSVC debug runtime
+
+The following are not API breakages but behavioral changes:
+
+- Signing now validates the signature date against the validity period of the supplied
+certificate. A missing signature date makes the validation fail. The validation can be
+disabled with `PdfSigningContext::SetSkipDateValidation(true)`
+- Signing with an external certificate now performs a cross-check verification of the signed
+hash by default. This check can be disabled with `PdfSignerCmsFlags::SkipVerification`
 
 # 1.0.* -> 1.1
 

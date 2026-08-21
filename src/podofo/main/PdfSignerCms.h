@@ -35,15 +35,24 @@ namespace PoDoFo
         ///< When supplying an external PdfSigningService, specify if
         ///< the service should be called for a dry run
         ServiceDoDryRun = 2,
-        ///< For signature encryptions that have a random component, make it deterministic
+        ///< For signing algorithms that have a random component, make it deterministic
         ///< Applies to ECDSA, ML-DSA, SLH-DSA
         Deterministic = 4,
+        ///< Skip the inline verification of the signed hash supplied by an external signing
+        ///< service or by a deferred signing. The verification is performed by default as a
+        ///< cross-check of the supplied signed hash, and it's never performed when a private
+        ///< key is supplied or during dry runs
+        SkipVerification = 8,
     };
 
+    // NOTE: The deprecated Encryption field below will cause deprecation warnings
+    // because of implictly generated costructors, hence we suppress warnings for
+    // the whole struct
+    PODOFO_SUPPRESS_DEPRECATED_PUSH
     struct PODOFO_API PdfSignerCmsParams final
     {
         PdfSignatureType SignatureType = PdfSignatureType::PAdES_B;
-        [[deprecated("Encryption should be automatically detected from the public key in the certificate")]]
+        [[deprecated("Unused: the signing algorithm is automatically detected from the public key in the certificate")]]
         PdfSignatureEncryption Encryption = PdfSignatureEncryption::RSA;
         PdfHashingAlgorithm Hashing = PdfHashingAlgorithm::SHA256;
         PdfSigningService SigningService;
@@ -51,6 +60,7 @@ namespace PoDoFo
         PdfSignedHashHandler SignedHashHandler;
         PdfSignerCmsFlags Flags = PdfSignerCmsFlags::None;
     };
+    PODOFO_SUPPRESS_DEPRECATED_POP
 
     enum class PdfSignatureAttributeFlags : uint32_t
     {
@@ -86,6 +96,9 @@ namespace PoDoFo
         PdfSignerCms();
 
     public:
+        /// Validate the signature date against the certificate validity period
+        /// @param date the date of the signature field. A missing date makes the validation fail
+        void ValidateSignatureDate(const nullable<PdfDate>& date) override;
         void AppendData(const bufferview& data) override;
         void ComputeSignature(charbuff& buffer, bool dryrun) override;
         void FetchIntermediateResult(charbuff& result) override;
@@ -125,6 +138,7 @@ namespace PoDoFo
         void checkContextInitialized();
         void ensureContextInitialized();
         void resetContext();
+        bool shouldVerify() const;
         void doSign(const bufferview& input, charbuff& output);
         void tryEnlargeSignatureContents(charbuff& contents);
     private:
