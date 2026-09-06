@@ -4,22 +4,25 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-/// Result of -verifySignatureWithData:/-verifySignatureAtPath:error:.
+/// Result of -verifySignatureAtPath:error:.
 typedef NS_ENUM(NSInteger, PoDoFoSignatureVerifyStatus) {
-    /// The signature could not be checked at all (missing /ByteRange,
-    /// malformed CMS/PKCS7 data, I/O error reading the document, etc.).
-    /// Distinct from Invalid — this means "unable to tell", not "checked,
-    /// and it's wrong".
-    PoDoFoSignatureVerifyStatusCouldNotVerify = 0,
+    /// The signature could not be checked. Missing or invalid PKCS7/CMS
+    /// contents, unsupported signer info layout, or a malformed /ByteRange.
+    PoDoFoSignatureVerifyStatusIndeterminate = 0,
 
-    /// The signature does not match the given bytes, or is otherwise
-    /// cryptographically invalid (eg. the document was modified after signing).
+    /// The signature is cryptographically invalid: the signed bytes were
+    /// modified, or the signature doesn't correspond to the certificate.
     PoDoFoSignatureVerifyStatusInvalid = 1,
 
-    /// The signature is cryptographically valid over the given bytes. This
-    /// does NOT mean the signer's certificate should be trusted: no
-    /// certificate chain or revocation checking is performed.
-    PoDoFoSignatureVerifyStatusValidNoTrust = 2,
+    /// The CMS signature is cryptographically valid over the signed bytes,
+    /// but the /ByteRange doesn't reach the end of the input: the document
+    /// has content that is not covered by the signature. The certificate
+    /// trust status is indeterminate.
+    PoDoFoSignatureVerifyStatusCryptoVerifiedPartialCoverage = 2,
+
+    /// The CMS signature is cryptographically valid and the /ByteRange
+    /// covers the whole input. The certificate trust status is indeterminate.
+    PoDoFoSignatureVerifyStatusCryptoVerified = 3,
 };
 
 /// A signature AcroForm field — wraps PoDoFo's PdfSignature.
@@ -76,20 +79,10 @@ typedef NS_ENUM(NSInteger, PoDoFoSignatureVerifyStatus) {
 /// the PDF file it belongs to (reads /ByteRange from the file at
 /// documentPath directly — no need to extract the bytes yourself).
 ///
-/// Does NOT validate the signer's certificate chain of trust — no trust
-/// store or revocation checking is performed. A ValidNoTrust result means
-/// the signature is cryptographically self-consistent (the document
-/// wasn't tampered with and the signature matches the embedded
-/// certificate), not that the certificate should be trusted.
+/// It performs no certificate trust validation, and it doesn't inspect the
+/// document beyond the signed revision: a complete verification is a
+/// document wide concern.
 - (PoDoFoSignatureVerifyStatus)verifySignatureAtPath:(NSString *)documentPath error:(NSError **)error;
-
-/// Cryptographically verifies this signature against caller-supplied
-/// bytes — the exact document content covered by -byteRange, with the
-/// /Contents entry itself excluded. Use -verifySignatureAtPath:error:
-/// instead unless you already have these exact bytes for another reason.
-///
-/// Same trust caveat as -verifySignatureAtPath:error:.
-- (PoDoFoSignatureVerifyStatus)verifySignatureWithData:(NSData *)signedData;
 
 @end
 

@@ -111,12 +111,9 @@ bool PdfSignatureContents::TryParse(const bufferview& contents)
     m_valid = false;
     m_signerInfos.clear();
     m_timestampToken.clear();
-    m_rawContents.clear();
 
     if (contents.empty())
         return false;
-
-    m_rawContents.assign(contents.data(), contents.size());
 
     BIO* bio = BIO_new_mem_buf(contents.data(), (int)contents.size());
     if (bio == nullptr)
@@ -271,42 +268,3 @@ bool PdfSignatureContents::TryGetTimestampToken(PdfSignatureTimestampInfo& info)
     return success;
 }
 
-PdfSignatureVerifyStatus PdfSignatureContents::VerifySignature(const bufferview& signedData) const
-{
-    if (!m_valid || m_rawContents.empty())
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-
-    // Re-parse into a fresh, call-local PKCS7* rather than retaining one as a
-    // class member: keeps this method thread-safe by construction (no shared
-    // mutable OpenSSL state — every object created here is local to this call
-    // and freed before returning) at the cost of a redundant parse per call.
-    BIO* contentsBio = BIO_new_mem_buf(m_rawContents.data(), (int)m_rawContents.size());
-    if (contentsBio == nullptr)
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-
-    PKCS7* p7 = d2i_PKCS7_bio(contentsBio, nullptr);
-    BIO_free(contentsBio);
-    if (p7 == nullptr)
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-
-    BIO* dataBio = BIO_new_mem_buf(signedData.data(), (int)signedData.size());
-    if (dataBio == nullptr)
-    {
-        PKCS7_free(p7);
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-    }
-
-    // PKCS7_NOVERIFY: skip certificate chain/trust validation (a NULL store
-    // is safe precisely because of this flag — confirmed against this
-    // project's actual OpenSSL build, not just the docs, since a wrong
-    // assumption here would be a real security-relevant bug). What's left is
-    // exactly the cryptographic check: recompute the digest of signedData,
-    // compare against what was signed, and verify the signature over it
-    // using the embedded certificate's public key.
-    int result = PKCS7_verify(p7, nullptr, nullptr, dataBio, nullptr, PKCS7_NOVERIFY);
-
-    BIO_free(dataBio);
-    PKCS7_free(p7);
-
-    return result == 1 ? PdfSignatureVerifyStatus::ValidNoTrust : PdfSignatureVerifyStatus::Invalid;
-}

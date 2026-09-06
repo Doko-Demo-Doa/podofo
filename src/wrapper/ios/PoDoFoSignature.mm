@@ -132,21 +132,13 @@ using namespace PoDoFo;
 {
     try {
         FileStreamDevice device(documentPath.UTF8String);
-        return (PoDoFoSignatureVerifyStatus)_signature->TryVerifySignature(device);
+        PdfSignatureVerifyStatus status;
+        _signature->TryVerifySignature(device, status);
+        return (PoDoFoSignatureVerifyStatus)status;
     } catch (const std::exception &e) {
         PoDoFoSetErrorFromException(error, e);
-        return PoDoFoSignatureVerifyStatusCouldNotVerify;
+        return PoDoFoSignatureVerifyStatusIndeterminate;
     }
-}
-
-- (PoDoFoSignatureVerifyStatus)verifySignatureWithData:(NSData *)signedData
-{
-    PdfSignatureContents contents;
-    if (!_signature->TryGetSignatureContents(contents) || !contents.IsValid())
-        return PoDoFoSignatureVerifyStatusCouldNotVerify;
-
-    bufferview view(reinterpret_cast<const char *>(signedData.bytes), (size_t)signedData.length);
-    return (PoDoFoSignatureVerifyStatus)contents.VerifySignature(view);
 }
 
 @end

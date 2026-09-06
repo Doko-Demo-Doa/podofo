@@ -832,7 +832,10 @@ TEST_CASE("TestSignatureVerify")
         dynamic_cast<PdfAnnotationWidget&>(
             doc.GetPages().GetPageAt(0).GetAnnotations().GetAnnotAt(0)).GetField());
 
-    REQUIRE(signature2.TryVerifySignature(*inputOutput) == PdfSignatureVerifyStatus::ValidNoTrust);
+    PdfSignatureVerifyStatus status;
+    REQUIRE(signature2.TryVerifySignature(*inputOutput, status));
+    REQUIRE((status == PdfSignatureVerifyStatus::CryptoVerified
+        || status == PdfSignatureVerifyStatus::CryptoVerifiedPartialCoverage));
 
     // Tamper with a byte inside the first /ByteRange span (currBuffer is the
     // actual backing storage inputOutput reads/writes through, so mutating it
@@ -848,7 +851,8 @@ TEST_CASE("TestSignatureVerify")
     REQUIRE(tamperOffset < currBuffer.size());
     currBuffer[tamperOffset] = (char)(currBuffer[tamperOffset] ^ 0x7F);
 
-    REQUIRE(signature2.TryVerifySignature(*inputOutput) == PdfSignatureVerifyStatus::Invalid);
+    REQUIRE(!signature2.TryVerifySignature(*inputOutput, status));
+    REQUIRE(status == PdfSignatureVerifyStatus::Invalid);
 }
 
 TEST_CASE("TestSignatureInfoPkcs7SigningTime")

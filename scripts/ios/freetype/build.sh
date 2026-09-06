@@ -54,14 +54,14 @@ function check() {
     fi
 }
 
-# GitHub mirror, not download.savannah.gnu.org (GNU Savannah's own
-# download server): found it fully unresponsive (502/504) while working on
-# this pipeline, unrelated to anything in this repo. Verified this tag
-# archive is a safe substitute for Savannah's official release tarball —
-# freetype (unlike libxml2) commits a pre-generated `configure` to its repo,
-# so no extra autogen.sh step is needed. GitHub tags use "VER-2-13-2" for
-# version "2.13.2", hence the dots->dashes translation below.
+# GitHub mirror: download.savannah.gnu.org was unresponsive (502/504).
 FREETYPE_TAG="VER-$(echo "$FREETYPE_VERSION" | tr '.' '-')"
+
+# subprojects/dlg is a git submodule a GitHub tag archive doesn't carry, and
+# freetype always compiles it in regardless of FT_DEBUG_LOGGING. Pin the
+# exact commit freetype's .gitmodules points to for $FREETYPE_TAG and fetch
+# its 3 needed files directly instead.
+DLG_COMMIT="0f5aa8d7b67d2c6b543fcdbe099bac18842caa09"
 
 function prepare() {
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
@@ -73,11 +73,24 @@ function prepare() {
         echo "Extracting freetype..."
         tar xzf "$DOWNLOAD_DIR/freetype-$FREETYPE_VERSION.tar.gz" -C "$BUILD_DIR"
         mv "$BUILD_DIR/freetype-${FREETYPE_TAG}" "$BUILD_DIR/freetype-$FREETYPE_VERSION"
+
+        mkdir -p "$BUILD_DIR/freetype-$FREETYPE_VERSION/include/dlg" "$BUILD_DIR/freetype-$FREETYPE_VERSION/src/dlg"
+        for f in include/dlg/dlg.h include/dlg/output.h src/dlg/dlg.c; do
+            curl -fL --retry 3 --retry-delay 5 --retry-all-errors \
+                -o "$BUILD_DIR/freetype-$FREETYPE_VERSION/$f" \
+                "https://raw.githubusercontent.com/nyorain/dlg/$DLG_COMMIT/$f"
+        done
     fi
 }
 
 function build() {
     mkdir -p "$BUILD_DIR" "$INSTALL_DIR"
+
+    # A GitHub tag archive lacks the autotools-generated builds/unix/configure.
+    if [ ! -f "$BUILD_DIR/freetype-$FREETYPE_VERSION/builds/unix/configure" ]; then
+        echo "Generating freetype configure script..."
+        (cd "$BUILD_DIR/freetype-$FREETYPE_VERSION" && ./autogen.sh)
+    fi
 
     for SLICE in "${IOS_SLICES[@]}"; do
         echo "Building for $SLICE..."

@@ -466,53 +466,6 @@ bool PdfSignature::TryGetPreviousRevision(InputStreamDevice& input, OutputStream
     return true;
 }
 
-PdfSignatureVerifyStatus PdfSignature::TryVerifySignature(InputStreamDevice& input) const
-{
-    auto byteRange = GetByteRange();
-    if (!byteRange.has_value() || byteRange->GetSize() != 4)
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-
-    int64_t offset1, length1, offset2, length2;
-    if (!byteRange->TryGetAtAs(0, offset1) || !byteRange->TryGetAtAs(1, length1)
-        || !byteRange->TryGetAtAs(2, offset2) || !byteRange->TryGetAtAs(3, length2)
-        || offset1 < 0 || length1 < 0 || offset2 < 0 || length2 < 0)
-    {
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-    }
-
-    // Bounds-check against the actual document length before allocating or
-    // reading anything, rather than trusting a possibly-corrupt or malicious
-    // /ByteRange (eg. an attacker-controlled huge length attempting a large
-    // allocation, or an out-of-bounds read).
-    size_t fileLength = input.GetLength();
-    size_t end1, end2, totalLength;
-    if (!(CheckedNumeric((size_t)offset1) + CheckedNumeric((size_t)length1)).AssignIfValid(&end1)
-        || !(CheckedNumeric((size_t)offset2) + CheckedNumeric((size_t)length2)).AssignIfValid(&end2)
-        || !(CheckedNumeric((size_t)length1) + CheckedNumeric((size_t)length2)).AssignIfValid(&totalLength)
-        || end1 > fileLength || end2 > fileLength)
-    {
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-    }
-
-    charbuff signedData;
-    signedData.resize(totalLength);
-
-    bool eof;
-    input.Seek((size_t)offset1);
-    if (input.Read(signedData.data(), (size_t)length1, eof) != (size_t)length1)
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-
-    input.Seek((size_t)offset2);
-    if (input.Read(signedData.data() + (size_t)length1, (size_t)length2, eof) != (size_t)length2)
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-
-    PdfSignatureContents contents;
-    if (!TryGetSignatureContents(contents) || !contents.IsValid())
-        return PdfSignatureVerifyStatus::CouldNotVerify;
-
-    return contents.VerifySignature(signedData);
-}
-
 PdfObject* PdfSignature::getValueObject() const
 {
     return m_ValueObj;
