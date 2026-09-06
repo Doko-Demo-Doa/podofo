@@ -283,6 +283,21 @@ void PdfIndirectObjectList::AddCompressedObjectStream(uint32_t objectNum)
     m_compressedObjectStreams.insert(objectNum);
 }
 
+void PdfIndirectObjectList::ClearCompressedObjectStreams()
+{
+    m_compressedObjectStreams.clear();
+}
+
+void PdfIndirectObjectList::RemoveCompressedObjectStream(uint32_t objectNum)
+{
+    m_compressedObjectStreams.erase(objectNum);
+}
+
+bool PdfIndirectObjectList::IsCompressedObjectStream(uint32_t objectNum) const
+{
+    return m_compressedObjectStreams.find(objectNum) != m_compressedObjectStreams.end();
+}
+
 void PdfIndirectObjectList::addNewObject(unique_ptr<PdfObject>&& obj)
 {
     PdfReference ref = getNextFreeObject();

@@ -9,7 +9,7 @@
 #include <podofo/auxiliary/OutputDevice.h>
 
 #include "PdfDocument.h"
-#include "PdfEncryptSession.h"
+#include "PdfEncrypt.h"
 
 namespace PoDoFo {
 
@@ -45,6 +45,8 @@ public:
 
     /// Construct a copy of the given document
     PdfMemDocument(const PdfMemDocument& rhs);
+
+    ~PdfMemDocument();
 
     /// Load a PdfMemDocument from a file
     ///
@@ -200,7 +202,11 @@ private:
 
     void reset() override;
 
-    void beforeWrite(PdfSaveOptions options);
+    void beforeWrite(PdfSaveOptions options, bool isUpdate);
+
+    /// Forget the object streams that have no unmodified object left to
+    /// preserve, so their containers are collected as garbage
+    void pruneCompressedObjectStreams(PdfSaveOptions options);
 
 private:
     PdfMemDocument& operator=(const PdfMemDocument&) = delete;
@@ -210,6 +216,7 @@ private:
     PdfVersion m_InitialVersion;
     bool m_HasXRefStream;
     bool m_HasBrokenXRef;
+    bool m_initiallyEncrypted;
     size_t m_MagicOffset;
     size_t m_PrevXRefOffset;
     std::unique_ptr<PdfEncryptSession> m_Encrypt;

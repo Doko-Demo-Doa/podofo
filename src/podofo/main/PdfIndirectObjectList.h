@@ -33,6 +33,7 @@ enum class PdfGarbageCollectionFlags : uint32_t
 class PODOFO_API PdfIndirectObjectList final
 {
     friend class PdfDocument;
+    friend class PdfMemDocument;
     friend class PdfObject;
     friend class PdfObjectOutputStream;
     PODOFO_PRIVATE_FRIEND(class PdfObjectStreamParser);
@@ -254,6 +255,22 @@ private:
     /// @remarks These objects are usually compressed and can't be removed,
     /// that's why the generation number is irrelevant
     void AddCompressedObjectStream(uint32_t objectNum);
+
+    /// Forget the registered object streams, so their containers are
+    /// removable and are collected as garbage when unreferenced
+    /// @remarks To be called only when the whole document is rewritten: on an
+    /// incremental update previous revisions still reference the containers
+    /// for their compressed objects
+    void ClearCompressedObjectStreams();
+
+    /// Forget a single registered object stream
+    /// @see ClearCompressedObjectStreams
+    void RemoveCompressedObjectStream(uint32_t objectNum);
+
+    /// @returns true if the object number is a registered object stream
+    bool IsCompressedObjectStream(uint32_t objectNum) const;
+
+    inline const PdfObjectNumSet& GetCompressedObjectStreams() const { return m_compressedObjectStreams; }
 
     std::unique_ptr<PdfObject> RemoveObject(const PdfReference& ref, bool markAsFree);
 
