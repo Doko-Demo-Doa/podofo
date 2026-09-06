@@ -86,20 +86,27 @@ function check() {
     fi
 }
 
+# GitHub mirror, not download.savannah.gnu.org (GNU Savannah's own
+# download server): found it fully unresponsive (502/504) while working on
+# the iOS pipeline, unrelated to anything in this repo. Verified this tag
+# archive is a safe substitute for Savannah's official release tarball —
+# freetype (unlike libxml2) commits a pre-generated `configure` to its repo,
+# so no extra autogen.sh step is needed. GitHub tags use "VER-2-13-2" for
+# version "2.13.2", hence the dots->dashes translation below.
+FREETYPE_TAG="VER-$(echo "$FREETYPE_VERSION" | tr '.' '-')"
+
 function prepare() {
     # Create directories if they don't exist
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    # Download freetype if not already present
-    if [ ! -f "$DOWNLOAD_DIR/freetype-$FREETYPE_VERSION.tar.gz" ]; then
-        echo "Downloading freetype..."
-        curl -L "https://download.savannah.gnu.org/releases/freetype/freetype-$FREETYPE_VERSION.tar.gz" -o "$DOWNLOAD_DIR/freetype-$FREETYPE_VERSION.tar.gz"
-    fi
+    download_verified "https://github.com/freetype/freetype/archive/refs/tags/${FREETYPE_TAG}.tar.gz" \
+        "$DOWNLOAD_DIR/freetype-$FREETYPE_VERSION.tar.gz"
 
     # Extract freetype if not already extracted
     if [ ! -d "$BUILD_DIR/freetype-$FREETYPE_VERSION" ]; then
         echo "Extracting freetype..."
         tar xzf "$DOWNLOAD_DIR/freetype-$FREETYPE_VERSION.tar.gz" -C "$BUILD_DIR"
+        mv "$BUILD_DIR/freetype-${FREETYPE_TAG}" "$BUILD_DIR/freetype-$FREETYPE_VERSION"
     fi
 }
 

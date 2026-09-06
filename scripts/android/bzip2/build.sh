@@ -66,11 +66,8 @@ function prepare() {
     # Create directories if they don't exist
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    # Download bzip2 if not already present
-    if [ ! -f "$DOWNLOAD_DIR/bzip2-$BZIP2_VERSION.tar.gz" ]; then
-        echo "Downloading bzip2..."
-        curl -L "https://sourceware.org/pub/bzip2/bzip2-$BZIP2_VERSION.tar.gz" -o "$DOWNLOAD_DIR/bzip2-$BZIP2_VERSION.tar.gz"
-    fi
+    download_verified "https://sourceware.org/pub/bzip2/bzip2-$BZIP2_VERSION.tar.gz" \
+        "$DOWNLOAD_DIR/bzip2-$BZIP2_VERSION.tar.gz"
 
     # Extract bzip2 if not already extracted
     if [ ! -d "$BUILD_DIR/bzip2-$BZIP2_VERSION" ]; then

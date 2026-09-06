@@ -72,10 +72,8 @@ function prepare() {
     # Create directories if they don't exist
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    # Download OpenSSL if not present
-    if [ ! -f "-C "$DOWNLOAD_DIR"/openssl-$OPENSSL_VERSION.tar.gz" ]; then
-        curl -L "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz" -o "$DOWNLOAD_DIR/openssl-$OPENSSL_VERSION.tar.gz" 
-    fi
+    download_verified "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz" \
+        "$DOWNLOAD_DIR/openssl-$OPENSSL_VERSION.tar.gz"
 
     # Extract OpenSSL
     if [ ! -d "$BUILD_DIR/openssl-$OPENSSL_VERSION" ]; then

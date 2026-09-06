@@ -54,9 +54,8 @@ function check() {
 function prepare() {
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    if [ ! -f "$DOWNLOAD_DIR/openssl-$OPENSSL_VERSION.tar.gz" ]; then
-        curl -L "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz" -o "$DOWNLOAD_DIR/openssl-$OPENSSL_VERSION.tar.gz"
-    fi
+    download_verified "https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz" \
+        "$DOWNLOAD_DIR/openssl-$OPENSSL_VERSION.tar.gz"
 
     if [ ! -d "$BUILD_DIR/openssl-$OPENSSL_VERSION" ]; then
         tar xzf "$DOWNLOAD_DIR/openssl-$OPENSSL_VERSION.tar.gz" -C "$BUILD_DIR"

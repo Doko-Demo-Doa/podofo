@@ -52,10 +52,8 @@ function check() {
 function prepare() {
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    if [ ! -f "$DOWNLOAD_DIR/libpng-$LIBPNG_VERSION.tar.gz" ]; then
-        echo "Downloading libpng..."
-        curl -L "https://downloads.sourceforge.net/project/libpng/libpng16/$LIBPNG_VERSION/libpng-$LIBPNG_VERSION.tar.gz" -o "$DOWNLOAD_DIR/libpng-$LIBPNG_VERSION.tar.gz"
-    fi
+    download_verified "https://downloads.sourceforge.net/project/libpng/libpng16/$LIBPNG_VERSION/libpng-$LIBPNG_VERSION.tar.gz" \
+        "$DOWNLOAD_DIR/libpng-$LIBPNG_VERSION.tar.gz"
 
     if [ ! -d "$BUILD_DIR/libpng-$LIBPNG_VERSION" ]; then
         echo "Extracting libpng..."

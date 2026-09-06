@@ -67,6 +67,28 @@ with_ccache() {
     fi
 }
 
+# Downloads a .tar.gz to $2 if missing, verifying gzip integrity either way.
+# Plain `curl -L` silently saves a short error-page response as if it were
+# the real file, and a corrupt cached download poisons every future run.
+download_verified() {
+    local url="$1"
+    local dest="$2"
+
+    if [ -f "$dest" ] && ! gzip -t "$dest" >/dev/null 2>&1; then
+        echo "Warning: $dest exists but is not a valid gzip archive (a previous download likely failed) -- re-downloading" >&2
+        rm -f "$dest"
+    fi
+
+    if [ ! -f "$dest" ]; then
+        curl -fL --retry 3 --retry-delay 5 --retry-all-errors -o "$dest" "$url"
+        if ! gzip -t "$dest" >/dev/null 2>&1; then
+            rm -f "$dest"
+            echo "Error: downloaded $dest but it is not a valid gzip archive" >&2
+            exit 1
+        fi
+    fi
+}
+
 # Populates CC/CXX/AR/RANLIB/STRIP/SYSROOT/ARCH/HOST/CFLAGS_ARCH for the given
 # build slice, for Makefile/autotools-based dependency scripts that need a
 # concrete compiler invocation rather than a CMake toolchain file. Also sets

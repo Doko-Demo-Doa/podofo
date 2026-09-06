@@ -66,11 +66,8 @@ function prepare() {
     # Create directories if they don't exist
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    # Download brotli if not already present
-    if [ ! -f "$DOWNLOAD_DIR/$BROTLI_VERSION.tar.gz" ]; then
-        echo "Downloading brotli..."
-        curl -L "https://github.com/google/brotli/archive/refs/tags/v$BROTLI_VERSION.tar.gz" -o "$DOWNLOAD_DIR/brotli-$BROTLI_VERSION.tar.gz"
-    fi
+    download_verified "https://github.com/google/brotli/archive/refs/tags/v$BROTLI_VERSION.tar.gz" \
+        "$DOWNLOAD_DIR/brotli-$BROTLI_VERSION.tar.gz"
 
     # Extract brotli if not already extracted
     if [ ! -d "$BUILD_DIR/brotli-$BROTLI_VERSION" ]; then

@@ -37,10 +37,8 @@ function check() {
 function prepare() {
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    if [ ! -f "$DOWNLOAD_DIR/bzip2-$BZIP2_VERSION.tar.gz" ]; then
-        echo "Downloading bzip2..."
-        curl -L "https://sourceware.org/pub/bzip2/bzip2-$BZIP2_VERSION.tar.gz" -o "$DOWNLOAD_DIR/bzip2-$BZIP2_VERSION.tar.gz"
-    fi
+    download_verified "https://sourceware.org/pub/bzip2/bzip2-$BZIP2_VERSION.tar.gz" \
+        "$DOWNLOAD_DIR/bzip2-$BZIP2_VERSION.tar.gz"
 
     if [ ! -d "$BUILD_DIR/bzip2-$BZIP2_VERSION" ]; then
         echo "Extracting bzip2..."

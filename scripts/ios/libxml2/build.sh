@@ -37,10 +37,8 @@ function check() {
 function prepare() {
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    if [ ! -f "$DOWNLOAD_DIR/libxml2-$LIBXML_VERSION.tar.gz" ]; then
-        echo "Downloading libxml2..."
-        curl -L "https://github.com/GNOME/libxml2/archive/refs/tags/v$LIBXML_VERSION.tar.gz" -o "$DOWNLOAD_DIR/libxml2-$LIBXML_VERSION.tar.gz"
-    fi
+    download_verified "https://github.com/GNOME/libxml2/archive/refs/tags/v$LIBXML_VERSION.tar.gz" \
+        "$DOWNLOAD_DIR/libxml2-$LIBXML_VERSION.tar.gz"
 
     if [ ! -d "$BUILD_DIR/libxml2-$LIBXML_VERSION" ]; then
         echo "Extracting libxml2..."

@@ -66,11 +66,8 @@ function prepare() {
     # Create directories if they don't exist
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    # Download libpng if not already present
-    if [ ! -f "$DOWNLOAD_DIR/libpng-$LIBPNG_VERSION.tar.gz" ]; then
-        echo "Downloading libpng..."
-        curl -L "https://downloads.sourceforge.net/project/libpng/libpng16/$LIBPNG_VERSION/libpng-$LIBPNG_VERSION.tar.gz" -o "$DOWNLOAD_DIR/libpng-$LIBPNG_VERSION.tar.gz"
-    fi
+    download_verified "https://downloads.sourceforge.net/project/libpng/libpng16/$LIBPNG_VERSION/libpng-$LIBPNG_VERSION.tar.gz" \
+        "$DOWNLOAD_DIR/libpng-$LIBPNG_VERSION.tar.gz"
 
     # Extract libpng if not already extracted
     if [ ! -d "$BUILD_DIR/libpng-$LIBPNG_VERSION" ]; then

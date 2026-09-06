@@ -37,10 +37,8 @@ function check() {
 function prepare() {
     mkdir -p "$BUILD_DIR" "$DOWNLOAD_DIR"
 
-    if [ ! -f "$DOWNLOAD_DIR/brotli-$BROTLI_VERSION.tar.gz" ]; then
-        echo "Downloading brotli..."
-        curl -L "https://github.com/google/brotli/archive/refs/tags/v$BROTLI_VERSION.tar.gz" -o "$DOWNLOAD_DIR/brotli-$BROTLI_VERSION.tar.gz"
-    fi
+    download_verified "https://github.com/google/brotli/archive/refs/tags/v$BROTLI_VERSION.tar.gz" \
+        "$DOWNLOAD_DIR/brotli-$BROTLI_VERSION.tar.gz"
 
     if [ ! -d "$BUILD_DIR/brotli-$BROTLI_VERSION" ]; then
         echo "Extracting brotli..."
