@@ -822,6 +822,7 @@ TEST_CASE("TestSignatureVerify")
     auto& annot = page.GetAnnotations().GetAnnotAt(0);
     auto& field = dynamic_cast<PdfAnnotationWidget&>(annot).GetField();
     auto& signature = dynamic_cast<PdfSignature&>(field);
+    signature.SetSignatureDate(TestSignatureDate);
 
     auto signer = PdfSignerCms(cert, pkey);
     PoDoFo::SignDocument(doc, *inputOutput, signer, signature, PdfSaveOptions::NoMetadataUpdate);
@@ -873,6 +874,7 @@ TEST_CASE("TestSignatureInfoPkcs7SigningTime")
     auto& annot = page.GetAnnotations().GetAnnotAt(0);
     auto& field = dynamic_cast<PdfAnnotationWidget&>(annot).GetField();
     auto& signature = dynamic_cast<PdfSignature&>(field);
+    signature.SetSignatureDate(TestSignatureDate);
 
     PdfSignerCmsParams params;
     params.SignatureType = PdfSignatureType::Pkcs7;
