@@ -43,6 +43,21 @@ top of PoDoFo core. See `CHANGELOG.md` for core library changes.
   `download_verified()`: Android brotli's existence check used the wrong
   filename, and Android openssl's was a mangled/always-false string
 
+### Testing / CI
+- `build-mac`'s test job had been failing to even compile since the upstream
+  merge, so its 12 test failures (once the redefinition error above was fixed)
+  had never actually been triaged. All 12 turned out pre-existing and
+  unrelated to the signature consolidation:
+  - Advanced the `extern/resources` submodule 3 commits, which were pinned
+    behind fixture updates the (already-merged) test code needed: the
+    regenerated `/Producer`-string fixture, the ML-DSA/SLH-DSA signed-document
+    fixtures, and the `TestFontWidthsRef(CID).pdf` fixtures — fixed 10 of 12
+  - `TestSignatureVerify`/`TestSignatureInfoPkcs7SigningTime` were missing the
+    `SetSignatureDate()` call every other signing test in `SignatureTest.cpp`
+    makes, which upstream's `PdfSignerCms::ValidateSignatureDate()` now
+    requires — fixed the remaining 2
+  - Full local suite: 272/272 passing
+
 ## Android AAR + iOS XCFramework builds
 
 Initial and ongoing build-out of both native wrappers, roughly in build order:
