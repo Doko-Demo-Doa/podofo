@@ -95,6 +95,8 @@ endif()
 
 option(PODOFO_BUILD_STATIC "Build static libraries (.a/.lib)" FALSE)
 option(PODOFO_WITH_AFDKO "Enable AFDKO support" ON)
+# NOTE: It lets the compiler inline across translation units
+option(PODOFO_WITH_LTO "Enable link time optimization in optimized builds" ON)
 
 if(PODOFO_WITH_AFDKO)
     set(PODOFO_ENABLE_AFDKO TRUE)
@@ -169,10 +171,12 @@ else()
     endif()
 endif()
 
+set(PODOFO_3RDPARTY_DEPENDS)
 set(PODOFO_3RDPARTY_INCLUDES
     "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/adobe"
     "${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/chromium"
 )
+set(PODOFO_PKGCONFIG_REQUIRES_PRIVATE)
 
 find_package(ZLIB REQUIRED)
 message("Found zlib headers in ${ZLIB_INCLUDE_DIR}, library at ${ZLIB_LIBRARIES}")
@@ -291,63 +295,59 @@ endif()
 # NOTE: Be careful when adding/removing: the order may be
 # platform sensible, so don't modify the current order
 
-set(PODOFO_PKGCONFIG_REQUIRES_PRIVATE "")
-set(PODOFO_HEADERS_DEPENDS)
-set(PODOFO_LIB_DEPENDS)
-
 if (PODOFO_DEVENDOR_TCBSPAN)
-    list(APPEND PODOFO_LIB_DEPENDS PUBLIC $<COMPILE_ONLY:tcbspan::tcbspan>)
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PUBLIC $<COMPILE_ONLY:tcbspan::tcbspan>)
 endif()
-list(APPEND PODOFO_LIB_DEPENDS PRIVATE OpenSSL::SSL)
+list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE OpenSSL::SSL)
 string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " libssl")
 if(Fontconfig_FOUND)
-    list(APPEND PODOFO_LIB_DEPENDS PRIVATE Fontconfig::Fontconfig)
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE Fontconfig::Fontconfig)
     string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " fontconfig")
 endif()
-list(APPEND PODOFO_LIB_DEPENDS PRIVATE Freetype::Freetype)
+list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE Freetype::Freetype)
 string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " freetype2")
-list(APPEND PODOFO_LIB_DEPENDS PRIVATE LibXml2::LibXml2)
+list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE LibXml2::LibXml2)
 string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " libxml-2.0")
 if(PNG_FOUND)
-    list(APPEND PODOFO_LIB_DEPENDS PRIVATE PNG::PNG)
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE PNG::PNG)
     string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " libpng")
 endif()
 if(TIFF_FOUND)
-    list(APPEND PODOFO_LIB_DEPENDS PRIVATE TIFF::TIFF)
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE TIFF::TIFF)
     string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " libtiff-4")
 endif()
 if(JPEG_FOUND)
-    list(APPEND PODOFO_LIB_DEPENDS PRIVATE JPEG::JPEG)
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE JPEG::JPEG)
     string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " libjpeg")
 endif()
-list(APPEND PODOFO_LIB_DEPENDS PRIVATE ZLIB::ZLIB)
+list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE ZLIB::ZLIB)
 string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " zlib")
 if (PODOFO_DEVENDOR_DATE)
-    list(APPEND PODOFO_LIB_DEPENDS PRIVATE $<COMPILE_ONLY:date::date>)
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE $<COMPILE_ONLY:date::date>)
 endif()
 if (PODOFO_DEVENDOR_FASTFLOAT)
-    list(APPEND PODOFO_LIB_DEPENDS PRIVATE $<COMPILE_ONLY:FastFloat::fast_float>)
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE $<COMPILE_ONLY:FastFloat::fast_float>)
 endif()
 if (PODOFO_DEVENDOR_FMT)
     if (PODOFO_DEVENDOR_FMT_HEADER_ONLY)
-        list(APPEND PODOFO_LIB_DEPENDS PRIVATE $<COMPILE_ONLY:fmt::fmt-header-only>)
+        list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE $<COMPILE_ONLY:fmt::fmt-header-only>)
     else()
-        list(APPEND PODOFO_LIB_DEPENDS PRIVATE fmt::fmt)
+        list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE fmt::fmt)
     endif()
 endif()
 if (PODOFO_DEVENDOR_UTF8CPP)
-    list(APPEND PODOFO_LIB_DEPENDS PRIVATE $<COMPILE_ONLY:utf8cpp::utf8cpp>)
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE $<COMPILE_ONLY:utf8cpp::utf8cpp>)
 endif()
 if (PODOFO_DEVENDOR_UTF8PROC)
-    list(APPEND PODOFO_LIB_DEPENDS PRIVATE utf8proc::utf8proc)
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE utf8proc::utf8proc)
     string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " libutf8proc")
 endif()
-list(APPEND PODOFO_LIB_DEPENDS PRIVATE ${PLATFORM_SYSTEM_LIBRARIES})
+list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE ${PLATFORM_SYSTEM_LIBRARIES})
 
 if(LCMS2_FOUND)
     # little-cms2 doesn't provide targets.
-    list(APPEND PODOFO_LIB_DEPENDS PRIVATE ${LCMS2_LIBRARIES})
-    list(APPEND PODOFO_HEADERS_DEPENDS ${LCMS2_INCLUDE_DIR})
+    list(APPEND PODOFO_3RDPARTY_DEPENDS PRIVATE ${LCMS2_LIBRARIES})
+    list(APPEND PODOFO_3RDPARTY_INCLUDES ${LCMS2_INCLUDE_DIR})
     string(APPEND PODOFO_PKGCONFIG_REQUIRES_PRIVATE " lcms2")
 endif()
 
@@ -367,17 +367,47 @@ function(add_source subdir subdir_path dstsources dstheaders)
     set(${dstheaders} ${${dstheaders}} PARENT_SCOPE)
 endfunction()
 
+if(PODOFO_WITH_LTO)
+    # NOTE: Only optimized configurations are considered. It must be enabled on
+    # all the targets linked in the library, or the compiler won't be able to
+    # inline across their translation units
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT LTO_NOT_SUPPORTED_REASON LANGUAGES C CXX)
+    if(LTO_SUPPORTED)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL TRUE)
+        if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+            # Force full /LTCG: the default for CMake is to enable /LTCG:incremental,
+            # which caches generated code in .iobj/.ipdb files. Verified with latest
+            # MSVC 2026 19.51.36257 that this may end producing a miscompiled binary
+            # TODO: Report this to Microsoft, as it seems a bug in the linker
+            foreach(_config RELEASE RELWITHDEBINFO MINSIZEREL)
+                foreach(_type EXE SHARED MODULE STATIC)
+                    string(APPEND CMAKE_${_type}_LINKER_FLAGS_${_config} " /LTCG")
+                endforeach()
+            endforeach()
+        endif()
+        message(STATUS "Link time optimization enabled in optimized builds")
+    else()
+        message(WARNING "Link time optimization is not supported: ${LTO_NOT_SUPPORTED_REASON}")
+    endif()
+endif()
+
 add_subdirectory(3rdparty)
 add_subdirectory(src/podofo)
-include_directories(${PODOFO_INCLUDE_DIRS})
+
+if(PODOFO_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif()
+
+# Unit tests and tools consume private headers as well. The public
+# includes come transitively from the podofo::podofo target
+include_directories(${PODOFO_INCLUDE_DIRS_PRIVATE})
 
 if(PODOFO_BUILD_TEST)
     enable_testing()
     add_subdirectory(test)
-endif()
-
-if(PODOFO_BUILD_EXAMPLES)
-    add_subdirectory(examples)
 endif()
 
 if(PODOFO_BUILD_UNSUPPORTED_TOOLS)

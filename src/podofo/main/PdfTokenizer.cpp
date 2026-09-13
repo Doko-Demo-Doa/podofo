@@ -89,15 +89,19 @@ bool PdfTokenizer::TryReadNextToken(InputStreamDevice& device, string_view& toke
         if (!device.Peek(ch1))
             goto Eof;
 
-        // ignore leading whitespaces
-        if (count == 0 && IsCharWhitespace(ch1))
+        if (count == 0)
         {
-            // Consume the whitespace character
-            (void)device.ReadChar();
-            continue;
+            // Consume the leading whitespaces
+            while (IsCharWhitespace(ch1))
+            {
+                (void)device.ReadChar();
+                if (!device.Peek(ch1))
+                    goto Eof;
+            }
         }
+
         // ignore comments
-        else if (ch1 == '%')
+        if (ch1 == '%')
         {
             // Consume all characters before the next line break
             do
@@ -586,9 +590,9 @@ bool PdfTokenizer::ReadArray(InputStreamDevice& device, PdfVariant& variant, con
         if (tokenType == endDelim)
             break;
 
+        // NOTE: EmplaceBackNoDirtySet() wires the parent link up front. See
+        // ReadDictionary for the rationale
         auto& newobj = arr.EmplaceBackNoDirtySet();
-        // See ReadDictionary for rationale on the up-front parent link
-        newobj.SetParent(arr);
 
         bool success;
         if (innerOpts.ThrowOnError)
