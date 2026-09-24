@@ -148,7 +148,6 @@ private:
     };
 
     using ReferenceSet = std::set<PdfReference>;
-    using ObserverList = std::vector<Observer*>;
     using ObjectList = std::set<PdfObject*, PdfObjectInequality>;
 
 public:
@@ -205,24 +204,19 @@ private:
     /// @returns the removed object
     std::unique_ptr<PdfObject> RemoveObject(const iterator& it);
 
-    /// Removes all objects from the vector
-    /// and resets it to the default state.
-    ///
-    /// If SetAutoDelete is true all objects are deleted.
-    /// All observers are removed from the vector.
-    ///
-    /// @see SetAutoDelete
-    /// @see IsAutoDelete
+    /// Removes and deletes all the objects, resetting
+    /// the list to the default state
+    /// @remarks The attached observer and stream factory are left untouched
     void Clear();
 
-    /// Attach a new observer
-    /// @param observer to attach
+    /// Attach the observer, replacing the one currently attached, if any
+    /// @param observer the observer to attach
     void AttachObserver(Observer& observer);
 
-    /// Detach an observer.
-    ///
-    /// @param observer observer to detach
-    void DetachObserver(Observer& observer);
+    /// Detach the currently attached observer
+    /// @remarks It shall be called by the observer before it's destroyed,
+    /// as the list outlives it
+    void DetachObserver();
 
     /// Every stream implementation has to call this in BeginAppend
     /// @param stream the stream object that is calling
@@ -279,11 +273,16 @@ private:
     /// @param factory a stream factory or nullptr to reset to the default factory
     void SetStreamFactory(StreamFactory* factory);
 
-    /// Reset the flag which determines if the free objects were invalidated
-    void ResetFreeObjectsInvalidated();
+    /// Forget the tracked free object changes, after they have been
+    /// written or after the document has been loaded
+    void ClearFreeObjectsDelta();
 
-    /// Determine if the free objects needs re-writing in incremental updates
-    bool AreFreeObjectsInvalidated() const { return m_FreeObjectsInvalidated; }
+    /// @returns the object numbers whose free state changed since the last save
+    /// @remarks Used to write only the modified entries in incremental updates
+    inline const PdfObjectNumSet& GetFreeObjectsDelta() const { return m_freeObjectsDelta; }
+
+    /// Try to find the reference of the free object with the given object number
+    bool TryFindFreeObject(uint32_t objNum, PdfReference& ref) const;
 
 private:
     /// Mark a reference as unused so that it can be reused for new objects.
@@ -314,12 +313,12 @@ private:
     PdfDocument* m_Document;
     ObjectList m_Objects;
     unsigned m_LastObjectNumber;
-    bool m_FreeObjectsInvalidated;
     PdfFreeObjectList m_FreeObjects;
     PdfObjectNumSet m_UnavailableObjects;
+    PdfObjectNumSet m_freeObjectsDelta;
     PdfObjectNumSet m_compressedObjectStreams;
 
-    ObserverList m_observers;
+    Observer* m_observer;
     StreamFactory* m_StreamFactory;
 };
 
