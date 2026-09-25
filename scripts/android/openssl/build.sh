@@ -27,7 +27,7 @@ BUILD_DIR="$TARGET_DIR/build"
 DOWNLOAD_DIR="$TARGET_DIR/download"
 INSTALL_DIR="$TARGET_DIR/install"
 
-API_LEVEL=21
+API_LEVEL=24
 # Define architectures and their corresponding OpenSSL targets
 ARCHS=("arm64-v8a" "armeabi-v7a" "x86" "x86_64")
 TARGETS=("android-arm64" "android-arm" "android-x86" "android-x86_64")

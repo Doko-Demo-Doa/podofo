@@ -30,7 +30,7 @@ INSTALL_DIR="$TARGET_DIR/install"
 
 # Define architectures to build for
 ARCHS=("arm64-v8a" "armeabi-v7a" "x86" "x86_64")
-API_LEVEL=21
+API_LEVEL=24
 
 function check() {
     # Check that NDK_DIR argument has been passed

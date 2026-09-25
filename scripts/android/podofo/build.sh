@@ -47,7 +47,7 @@ PODOFO_SRC_DIR="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Define architectures to build for
 ARCHS=("arm64-v8a" "armeabi-v7a" "x86" "x86_64")
-API_LEVEL=21
+API_LEVEL=24
 
 # If TARGET_ARCH is specified, only build for that architecture
 if [ -n "$TARGET_ARCH" ]; then

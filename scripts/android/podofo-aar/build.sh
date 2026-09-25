@@ -35,7 +35,7 @@ fi
 
 # Set up NDK toolchain
 TOOLCHAIN="$NDK_DIR/toolchains/llvm/prebuilt/$HOST_TAG"
-API_LEVEL=21
+API_LEVEL=24
 
 mkdir -p "$BUILD_DIR"
 
