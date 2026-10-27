@@ -71,23 +71,32 @@ void PdfSignerCms::ComputeSignature(charbuff& contents, bool dryrun)
     if (m_parameters.SigningService == nullptr)
     {
         // Do default signing
-        doSign(hashToSign, m_encryptedHash);
+        doSign(hashToSign, m_signedHash);
     }
     else if (!dryrun || (m_parameters.Flags & PdfSignerCmsFlags::ServiceDoDryRun) != PdfSignerCmsFlags::None)
     {
-        m_parameters.SigningService(hashToSign, dryrun, m_encryptedHash);
+        m_parameters.SigningService(hashToSign, dryrun, m_signedHash);
     }
     else
     {
-        // Just prepare a fake result with the size of RSA block
-        m_encryptedHash.resize(m_cmsContext->GetSignedHashSize());
+        // Just prepare a fake result with the maximum size of the signature block
+        m_signedHash.resize(m_cmsContext->GetSignedHashSize());
     }
 
     if (m_parameters.SignedHashHandler != nullptr)
-        m_parameters.SignedHashHandler(m_encryptedHash, dryrun);
+        m_parameters.SignedHashHandler(m_signedHash, dryrun);
+
+    // In all cases, defensively prevent the signed hash to be
+    // smaller than the maximum size of the signature block,
+    // which may be non deterministic in some signing algorithms (eg. ECDSA)
+    if (dryrun && m_signedHash.size() < m_cmsContext->GetSignedHashSize())
+        m_signedHash.resize(m_cmsContext->GetSignedHashSize());
 
     // NOTE: On dry runs the signed hash may be just a fake buffer with the expected size
-    m_cmsContext->ComputeSignature(m_encryptedHash, contents, !dryrun && shouldVerify());
+    if (!dryrun && shouldVerifyTimeStamp())
+        m_cmsContext->VerifyTimeStampImprint(m_signedHash);
+
+    m_cmsContext->ComputeSignature(m_signedHash, contents, !dryrun && shouldVerify());
     if (dryrun)
         tryEnlargeSignatureContents(contents);
 }
@@ -115,6 +124,9 @@ void PdfSignerCms::ComputeSignatureDeferred(const bufferview& processedResult, c
     }
     else
     {
+        if (shouldVerifyTimeStamp())
+            m_cmsContext->VerifyTimeStampImprint(processedResult);
+
         m_cmsContext->ComputeSignature(processedResult, contents, shouldVerify());
     }
 }
@@ -193,6 +205,12 @@ void PdfSignerCms::AddAttribute(const string_view& nid, const bufferview& attr, 
         asOctetString = true;
 
     m_cmsContext->AddAttribute(nid, attr, signedAttr, asOctetString);
+}
+
+void PdfSignerCms::SetTrustedTimestamp(const bufferview& timeStamp)
+{
+    ensureContextInitialized();
+    m_cmsContext->SetTimeStampToken(ssl::GetTimeStampToken(timeStamp));
 }
 
 void PdfSignerCms::ReserveAttributeSize(unsigned attrSize)
@@ -422,6 +440,13 @@ bool PdfSignerCms::shouldVerify() const
         && (m_parameters.Flags & PdfSignerCmsFlags::SkipVerification) == PdfSignerCmsFlags::None;
 }
 
+bool PdfSignerCms::shouldVerifyTimeStamp() const
+{
+    // NOTE: the timestamp check is always supplied externally,
+    // so we skip it only when voluntarily disabled by the user
+    return (m_parameters.Flags & PdfSignerCmsFlags::SkipVerification) == PdfSignerCmsFlags::None;
+}
+
 void PdfSignerCms::doSign(const bufferview& input, charbuff& output)
 {
     PODOFO_ASSERT(m_privKey != nullptr);
@@ -432,14 +457,6 @@ void PdfSignerCms::doSign(const bufferview& input, charbuff& output)
 
 void PdfSignerCms::tryEnlargeSignatureContents(charbuff& contents)
 {
-    if (m_cmsContext->GetSigningAlgorithm() == PdfSigningAlgorithm::ECDSA)
-    {
-        // Unconditionally account for 2 slack bytes due to random nature of ECDSA
-        contents.resize(contents.size() + 2 + m_reservedSize);
-    }
-    else
-    {
-        if (m_reservedSize != 0)
-            contents.resize(contents.size() + m_reservedSize);
-    }
+    if (m_reservedSize != 0)
+        contents.resize(contents.size() + m_reservedSize);
 }

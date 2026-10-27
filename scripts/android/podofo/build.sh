@@ -124,6 +124,7 @@ function build() {
             -DOPENSSL_INCLUDE_DIR="$OPENSSL_DIR/$ABI/include" \
             -DOPENSSL_CRYPTO_LIBRARY="$OPENSSL_DIR/$ABI/lib/libcrypto.a" \
             -DOPENSSL_SSL_LIBRARY="$OPENSSL_DIR/$ABI/lib/libssl.a" \
+            -DPODOFO_WITH_LTO=OFF \
             -DPODOFO_BUILD_STATIC=ON \
             -DPODOFO_BUILD_LIB_ONLY=TRUE \
             -DPODOFO_WITH_FONTMANAGER=OFF \

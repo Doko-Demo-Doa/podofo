@@ -51,6 +51,10 @@ namespace PoDoFo
         /// Add an extra X.509 certificate (DER or PEM) to the CMS "certificates" collection,
         /// without making it a signer (eg. to embed the intermediate/chain certificates)
         void AddCertificate(const bufferview& cert);
+        /// Set the signature timestamp token unsigned attribute, replacing the existing ones
+        void SetTimeStampToken(const bufferview& token);
+        /// Verify the message imprint of the signature timestamp tokens, if any, against the signed hash
+        void VerifyTimeStampImprint(const bufferview& signedHash) const;
         void Dump(xmlNodePtr elem, std::string& temp);
         void Restore(xmlNodePtr elem, charbuff& temp);
         unsigned GetSignedHashSize() const;
