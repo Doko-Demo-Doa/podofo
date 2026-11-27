@@ -221,7 +221,7 @@ private:
     /// signature field. It throws if the /ByteRange is present but malformed
     nullable<std::array<size_t, 4>> GetByteRangeBounds() const;
 
-    void ensureValueObject();
+    PdfDictionary& ensureValueDictionary();
 
     nullable<const PdfName&> getNameFromValueDict(const std::string_view& key) const;
     nullable<const PdfString&> getStringFromValueDict(const std::string_view& key) const;
@@ -229,9 +229,6 @@ private:
     nullable<const PdfDictionary&> getDictionaryFromValueDict(const std::string_view& key) const;
 private:
     void init(PdfAcroForm& acroForm);
-
-private:
-    PdfObject* m_ValueObj;
 };
 
 }

@@ -219,6 +219,15 @@ PdfObject& PdfIndirectObjectList::CreateArrayObject()
     return ret;
 }
 
+PdfObject& PdfIndirectObjectList::CreateNullObject()
+{
+    unique_ptr<PdfObject> obj(new PdfObject(nullptr));
+    obj->setDirty();
+    auto& ret = *obj;
+    addNewObject(std::move(obj));
+    return ret;
+}
+
 PdfObject& PdfIndirectObjectList::CreateObject(const PdfObject& obj)
 {
     unique_ptr<PdfObject> newObj(new PdfObject(obj));
@@ -242,8 +251,7 @@ void PdfIndirectObjectList::AddFreeObjectSafe(const PdfReference& reference)
     // Documentation 3.4.3 Cross-Reference Table states: "The maximum
     // generation number is 65535; when a cross reference entry reaches
     // this value, it is never reused."
-    // NOTE: gennum is uint32 to accommodate overflows from callers
-    if (reference.GenerationNumber() >= MAX_XREF_GENERATION_NUM)
+    if (reference.GenerationNumber() == MAX_XREF_GENERATION_NUM)
     {
         AddUnavailableObject(reference.ObjectNumber());
         return;
@@ -310,7 +318,9 @@ void PdfIndirectObjectList::PushObject(unique_ptr<PdfObject> obj)
     obj->SetDocument(m_Document);
 
     ObjectList::node_type node;
-    auto it = m_Objects.lower_bound(obj.get());
+    // Look up by number only: an existing object with a lower
+    // generation must be found as well
+    auto it = m_Objects.lower_bound(PdfReference(obj->GetIndirectReference().ObjectNumber(), 0));
     auto hintpos = it;
     if (it != m_Objects.end()
         && (*it)->GetIndirectReference().ObjectNumber() == obj->GetIndirectReference().ObjectNumber())
@@ -336,16 +346,28 @@ void PdfIndirectObjectList::markObjectFree(const PdfReference& reference, bool d
     // 1 to indicate the generation number to be used the next time an
     // object with that object number is created. Thus, each time
     // the entry is reused, it is given a new generation number."
+    if (reference.GenerationNumber() == MAX_XREF_GENERATION_NUM)
+    {
+        // The generation can't be incremented anymore, retire the object number
+        AddUnavailableObject(reference.ObjectNumber());
+        return;
+    }
+
     PdfReference freeObjRef(reference.ObjectNumber(), reference.GenerationNumber() + 1);
     if (doConsistencyCheck)
     {
-        auto found = m_Objects.find(freeObjRef);
-        if (found != m_Objects.end())
+        // Refuse to free the number if any other live object uses it,
+        // whatever its generation, otherwise the next created object
+        // would take the number and replace the live one
+        for (auto it = m_Objects.lower_bound(PdfReference(reference.ObjectNumber(), 0));
+            it != m_Objects.end() && (*it)->GetIndirectReference().ObjectNumber() == reference.ObjectNumber(); it++)
         {
-            // The free object reference is already used by an
-            // existing object, just exit
+            auto& liveRef = (*it)->GetIndirectReference();
+            if (liveRef == reference)
+                continue;
+
             PoDoFo::LogMessage(PdfLogSeverity::Warning, "Object {} {} R marked free but same object with generation {} exists",
-                reference.ObjectNumber(), reference.GenerationNumber(), freeObjRef.GenerationNumber());
+                reference.ObjectNumber(), reference.GenerationNumber(), liveRef.GenerationNumber());
             return;
         }
     }
@@ -365,6 +387,10 @@ void PdfIndirectObjectList::CollectGarbage(PdfGarbageCollectionFlags flags)
 {
     if (m_Document == nullptr)
         return;
+
+    // The observer is the streamed document writer, which keeps the objects it already wrote
+    if (m_observer != nullptr)
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::NotImplemented, "Collecting garbage in a streamed document is not supported");
 
     CollectGarbage(m_Document->GetTrailer().GetObject(),
         (flags & PdfGarbageCollectionFlags::SkipFixInvalidRefs) == PdfGarbageCollectionFlags::None);
@@ -386,6 +412,7 @@ void PdfIndirectObjectList::CollectGarbage(PdfObject& trailer, bool fixInvalidRe
     }
 
     vector<PdfObject*> objectsToDelete;
+    unordered_set<PdfReference> collected;
     ObjectList newlist;
     for (PdfObject* obj : m_Objects)
     {
@@ -396,11 +423,16 @@ void PdfIndirectObjectList::CollectGarbage(PdfObject& trailer, bool fixInvalidRe
         {
             markObjectFree(ref, true);
             objectsToDelete.push_back(obj);
+            collected.insert(ref);
             continue;
         }
 
         newlist.insert(obj);
     }
+
+    // The document drops its caches over the collected objects before they are deleted
+    if (m_Document != nullptr && collected.size() != 0)
+        m_Document->onObjectsCollected(collected);
 
     for (auto obj : objectsToDelete)
         delete obj;

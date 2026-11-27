@@ -33,7 +33,10 @@ public:
     /// The higher the maximum (enum integral value), the more is logged
     static PdfLogSeverity GetMaxLoggingSeverity();
 
-    // set maximum recursion depth (set to 0 to disable recursion check)
+    /// Set the maximum nesting depth of the recursive operations guarded against
+    /// stack overflow, such as parsing nested objects. The default is 256
+    /// @remarks The check can't be disabled: exceeding the depth raises
+    /// PdfErrorCode::MaxRecursionReached, so 0 makes every guarded operation fail
     static void SetMaxRecursionDepth(unsigned maxRecursionDepth);
 
     static unsigned GetMaxRecursionDepth();
@@ -42,7 +45,17 @@ public:
     static bool IsLoggingSeverityEnabled(PdfLogSeverity logSeverity);
 
     static unsigned GetMaxObjectCount();
+
+    /// @remarks Values above 4294967294 are capped, so the object
+    /// number following the last one never wraps to 0
     static void SetMaxObjectCount(unsigned maxObjectCount);
+
+    /// Set the maximum count of bytes the filters of a stream may produce while
+    /// decoding it, summed across the filter chain. The default is 512 MiB
+    /// @remarks Decoding a stream that exceeds it raises PdfErrorCode::ValueOutOfRange
+    static void SetMaxDecodedStreamSize(size_t maxDecodedStreamSize);
+
+    static size_t GetMaxDecodedStreamSize();
 };
 
 }

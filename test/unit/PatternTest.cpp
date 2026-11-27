@@ -863,3 +863,50 @@ TEST_CASE("TestType3RadialShading")
     doc.Save(TestUtils::GetTestOutputFilePath("TestType3RadialShading.pdf"), PdfSaveOptions::NoMetadataUpdate);
     TestUtils::AreFilesEqual(TestUtils::GetTestOutputFilePath("TestType3RadialShading.pdf"), TestUtils::GetTestInputFilePath("TestType3RadialShadingRef.pdf"));
 }
+
+TEST_CASE("TestShadingPatternFromObject")
+{
+    // A pattern loaded from an object has a shading, a placeholder until it's deserialized
+    PdfMemDocument doc;
+    auto expFoo = doc.CreateFunction(std::make_shared<PdfExponentialFunctionDefinition>(1.048, vector<double>{ 0, 1 },
+        vector<double>{ 0.929, 0.357, 1, 0.298 }, vector<double>{ 0.631, 0.278, 1, 0.027 }));
+    auto radialShadingDef = std::make_shared<PdfRadialShadingDefinition>(PdfColorSpaceType::DeviceCMYK,
+        *expFoo, array<double, 6>{ 0, 0, 0.096, 0, 0, 1 }, array<bool, 2>{ true, true });
+    auto radialShading = doc.CreateShadingDictionary(radialShadingDef);
+    auto pattern = doc.CreateShadingPattern(std::make_shared<PdfShadingPatternDefinition>(*radialShading));
+    REQUIRE_NOTHROW(pattern->GetDefinition().GetShading());
+
+    unique_ptr<PdfShadingPattern> loaded;
+    REQUIRE(PdfPattern::TryCreateFromObject<PdfShadingPattern>(pattern->GetObject(), loaded));
+    REQUIRE(loaded->GetDefinition().GetShadingPtr() != nullptr);
+    REQUIRE_NOTHROW(loaded->GetDefinition().GetShading().GetShadingType());
+}
+
+TEST_CASE("TestSampledFunctionEncode")
+{
+    // The /Encode check walks the inputs, not the range, and a function needs an input
+    PdfMemDocument doc;
+    auto fn = doc.CreateFunction(std::make_shared<PdfSampledFunctionDefinition>(vector<unsigned>{ 2, 3 }, 8,
+        vector<unsigned>{ 0, 1, 2, 3, 4, 5 }, vector<double>{ 0, 1, 0, 1 }, vector<double>{ 0, 1 }));
+    REQUIRE(!fn->GetDictionary().HasKey("Encode"));
+    auto fn2 = doc.CreateFunction(std::make_shared<PdfSampledFunctionDefinition>(vector<unsigned>{ 2 }, 8,
+        vector<unsigned>{ 0, 255 }, vector<double>{ 0, 1 }, vector<double>{ 0, 1 },
+        PdfSampledFunctionOrder::Linear, vector<double>{ 0, 0.5 }));
+    REQUIRE(fn2->GetDictionary().HasKey("Encode"));
+    auto createEmpty = []()
+    {
+        PdfSampledFunctionDefinition def(vector<unsigned>{ }, 8, vector<unsigned>{ 0 }, vector<double>{ }, vector<double>{ 0, 1 });
+    };
+    ASSERT_THROW_WITH_ERROR_CODE(createEmpty(), PdfErrorCode::InvalidInput);
+}
+
+TEST_CASE("TestFunctionExportRange")
+{
+    // The range is exported as /Range, leaving /Domain untouched
+    PdfMemDocument doc;
+    auto fn = doc.CreateFunction(std::make_shared<PdfExponentialFunctionDefinition>(1, vector<double>{ 0, 1 },
+        vector<double>{ 0 }, vector<double>{ 1 }, vector<double>{ 0, 2 }));
+    auto& dict = fn->GetDictionary();
+    REQUIRE(dict.MustGetKey("Domain").GetArray()[1].GetReal() == 1);
+    REQUIRE(dict.MustGetKey("Range").GetArray()[1].GetReal() == 2);
+}

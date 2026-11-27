@@ -45,6 +45,11 @@ struct PODOFO_API PdfFontSearchParams final
 /// a PDF file (i.e. it does also font embedding)
 /// and PdfFontMetrics provides only metrics information.
 ///
+/// @remarks The fonts created here are indirect objects referenced only
+/// once used, e.g. drawn with PdfPainter: a garbage collection, run by
+/// default when saving, deletes the unused ones and invalidates the
+/// PdfFont instances returned for them
+///
 /// @see PdfDocument
 class PODOFO_API PdfFontManager final
 {
@@ -162,10 +167,20 @@ private:
 private:
     const PdfFont* GetLoadedFont(const PdfResources& resources, const std::string_view& name);
 
+    /// Remove the cached inline font with the given name in the resources
+    void RemoveInlineFont(const PdfResources& resources, const std::string_view& name);
+
+    /// Remove the cached inline fonts of the resources, and of any other
+    /// resources having the same first indirect ancestor
+    void RemoveInlineFonts(const PdfResources& resources);
+
     /// Empty the internal font cache.
     /// This should be done whenever a new document
     /// is created or opened.
     void Clear();
+
+    /// Remove the fonts whose object is being garbage collected
+    void RemoveCollected(const std::unordered_set<PdfReference>& collected);
 
     PdfFont* AddImported(std::unique_ptr<PdfFont>&& font);
 
@@ -258,6 +273,8 @@ private:
     std::unordered_map<std::string, std::unique_ptr<PdfFont>> m_inlineFonts;
 
 #ifdef PODOFO_HAVE_FONTCONFIG
+    static std::shared_ptr<PdfFontConfigWrapper> getFontConfigWrapper();
+
     static std::shared_ptr<PdfFontConfigWrapper> m_fontConfig;
 #endif
 };

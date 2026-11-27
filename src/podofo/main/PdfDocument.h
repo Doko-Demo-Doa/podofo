@@ -111,6 +111,7 @@ class PODOFO_API PdfDocument
     friend class PdfPageCollection;
     friend class PdfMemDocument;
     friend class PdfStreamedDocument;
+    friend class PdfIndirectObjectList;
 
 public:
     /// Close down/destruct the PdfDocument
@@ -139,6 +140,7 @@ public:
     /// @returns PdfObject the AcroForm dictionary
     PdfAcroForm& GetOrCreateAcroForm(PdfAcroFormDefaulAppearance eDefaultAppearance = PdfAcroFormDefaulAppearance::ArialBlack);
 
+    /// @remarks Not supported on a PdfStreamedDocument
     void CollectGarbage(PdfGarbageCollectionFlags flags = PdfGarbageCollectionFlags::None);
 
     /// Construct a new PdfImage object
@@ -306,6 +308,9 @@ public:
     /// or root object.
     ///
     /// @returns PdfObject the documents catalog
+    /// @remarks Editing through the raw dictionary the entries managed by the typed
+    /// accessors, such as /Pages, /AcroForm, /Outlines or /Names, is not supported,
+    /// see PdfElement
     PdfCatalog& GetCatalog() { return *m_Catalog; }
 
     /// Get access to the internal Catalog dictionary
@@ -326,6 +331,8 @@ public:
     /// or root object.
     ///
     /// @returns PdfTrailer the document's trailer
+    /// @remarks Editing through the raw dictionary the /Root or /Info entries is
+    /// not supported, see PdfElement
     PdfTrailer &GetTrailer() { return *m_Trailer; }
 
     /// Get access to the internal trailer dictionary
@@ -385,6 +392,7 @@ protected:
     /// Clear all variables that have internal memory usage
     void Clear();
 
+    /// Called by Clear() before anything is cleared
     virtual void clear();
 
     /// Get the PDF version of the document
@@ -404,11 +412,11 @@ private:
 
     // Called by PdfPageCollection
     void AppendDocumentPages(const PdfDocument& doc);
-    void InsertDocumentPageAt(unsigned atIndex, const PdfDocument& doc, unsigned pageIndex, std::unordered_map<PdfReference, PdfObject*>& map);
-    void AppendDocumentPages(const PdfDocument& doc, unsigned pageIndex, unsigned pageCount, std::unordered_map<PdfReference, PdfObject*>& map);
+    void InsertDocumentPageAt(unsigned atIndex, const PdfDocument& doc, unsigned pageIndex, std::unordered_map<PdfReference, PdfReference>& map);
+    void AppendDocumentPages(const PdfDocument& doc, unsigned pageIndex, unsigned pageCount, std::unordered_map<PdfReference, PdfReference>& map);
 
     // Called by PdfXObjectForm
-    Rect FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page, PdfFillFormFlags flags, std::unordered_map<PdfReference, PdfObject*>* map);
+    Rect FillXObjectFromPage(PdfXObjectForm& xobj, const PdfPage& page, PdfFillFormFlags flags, std::unordered_map<PdfReference, PdfReference>* map);
 
     PdfInfo& GetOrCreateInfo();
 
@@ -418,12 +426,15 @@ private:
     void deletePages(unsigned atIndex, unsigned pageCount);
 
     void appendOutlineItems(PdfOutlineItem& destParent, const PdfOutlineItem* srcItem,
-        const PdfIndirectObjectList& srcObjects, std::unordered_map<PdfReference, PdfObject*>& mappedObjects);
+        const PdfIndirectObjectList& srcObjects, std::unordered_map<PdfReference, PdfReference>& mappedObjects);
 
     void resetPrivate();
 
     void lazyLoadOutlines();
     void lazyLoadInfo();
+
+    // Called by PdfIndirectObjectList::CollectGarbage before deleting the objects
+    void onObjectsCollected(const std::unordered_set<PdfReference>& collected);
 
 private:
     PdfDocument& operator=(const PdfDocument&) = delete;

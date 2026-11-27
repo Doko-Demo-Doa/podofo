@@ -319,6 +319,138 @@ TEST_CASE("TestFileDeviceSeekRetainsBuffer")
     REQUIRE(ch == expected[fileSize - 1]);
 }
 
+TEST_CASE("TestStringStreamWriteOwnContent")
+{
+    // Writing the content of the stream into itself, which grows the buffer
+    PdfStringStream stream;
+    stream << "0123456789";
+    string content(stream.GetString());
+    for (unsigned i = 0; i < 4; i++)
+    {
+        stream << stream.GetString();
+        content += content;
+    }
+
+    stream << stream.GetString().substr(0, 10);
+    content += content.substr(0, 10);
+    REQUIRE(stream.GetString() == content);
+}
+
+TEST_CASE("TestWriteOnlyDeviceCopyTo")
+{
+    // Reading from a write only device is rejected also when copying
+    ostringstream out;
+    StandardStreamDevice writeOnly(out);
+    charbuff buffer;
+    BufferStreamDevice destination(buffer);
+    ASSERT_THROW_WITH_ERROR_CODE(writeOnly.CopyTo(destination), PdfErrorCode::InternalLogic);
+    ASSERT_THROW_WITH_ERROR_CODE(writeOnly.CopyTo(destination, 10), PdfErrorCode::InternalLogic);
+}
+
+TEST_CASE("TestReadOnlyDeviceFlush")
+{
+    // Flushing a read only device is rejected, also through an empty copy
+    istringstream in("data");
+    StandardStreamDevice readOnly(in);
+    ASSERT_THROW_WITH_ERROR_CODE(readOnly.Flush(), PdfErrorCode::InternalLogic);
+    SpanStreamDevice empty(""sv);
+    ASSERT_THROW_WITH_ERROR_CODE(empty.CopyTo(readOnly), PdfErrorCode::InternalLogic);
+}
+
+TEST_CASE("TestStreamedDocumentUnwrittenStream")
+{
+    // A stream never written can't be read back when finishing the document:
+    // the failure is reported instead of escaping the destructor
+    charbuff buffer;
+    {
+        auto device = std::make_shared<BufferStreamDevice>(buffer);
+        PdfStreamedDocument doc(device);
+        doc.GetPages().CreatePage(PdfPageSize::A4);
+        auto& obj = doc.GetObjects().CreateDictionaryObject();
+        obj.GetOrCreateStream();
+    }
+
+    REQUIRE(string_view(buffer).substr(0, 5) == "%PDF-");
+}
+
+TEST_CASE("TestStreamedDocumentRewriteStream")
+{
+    // An object stream can be written to the streamed device only once
+    charbuff buffer;
+    auto device = std::make_shared<BufferStreamDevice>(buffer);
+    PdfStreamedDocument doc(device);
+    auto form = doc.CreateXObjectForm(Rect(0, 0, 10, 10));
+    auto& objStream = form->GetObject().GetOrCreateStream();
+    objStream.SetData(string_view("0 0 m 10 10 l S"));
+    ASSERT_THROW_WITH_ERROR_CODE(objStream.SetData(string_view("1 1 m 9 9 l S")), PdfErrorCode::ChangeOnImmutable);
+}
+
+TEST_CASE("TestStreamedDocumentResetRejected")
+{
+    // Reset is rejected before anything is cleared, as the writer keeps
+    // pointers to the trailer and to the objects already streamed
+    charbuff buffer;
+    {
+        auto device = std::make_shared<BufferStreamDevice>(buffer);
+        PdfStreamedDocument doc(device);
+        doc.GetPages().CreatePage(PdfPageSize::A4);
+        auto form = doc.CreateXObjectForm(Rect(0, 0, 10, 10));
+        form->GetObject().GetOrCreateStream().SetData(string_view("0 0 m 10 10 l S"));
+        ASSERT_THROW_WITH_ERROR_CODE(doc.Reset(), PdfErrorCode::NotImplemented);
+        REQUIRE(doc.GetPages().GetCount() == 1);
+    }
+
+    PdfMemDocument loaded;
+    loaded.LoadFromBuffer(buffer);
+    REQUIRE(loaded.GetPages().GetCount() == 1);
+}
+
+TEST_CASE("TestStreamedDocumentDeviceFailure")
+{
+    // A device failing while the streams and the document are finished:
+    // the failures are reported instead of escaping the destructors
+    class FailingStringBuf final : public stringbuf
+    {
+    public:
+        bool Fail = false;
+    protected:
+        streamsize xsputn(const char* s, streamsize n) override
+        {
+            return Fail ? 0 : stringbuf::xsputn(s, n);
+        }
+        int_type overflow(int_type ch) override
+        {
+            return Fail ? traits_type::eof() : stringbuf::overflow(ch);
+        }
+        int sync() override
+        {
+            return Fail ? -1 : stringbuf::sync();
+        }
+    };
+
+    FailingStringBuf buf;
+    ostream stream(&buf);
+    {
+        PdfStreamedDocument doc(std::make_shared<StandardStreamDevice>(stream));
+        auto& obj = doc.GetObjects().CreateDictionaryObject();
+        auto output = obj.GetOrCreateStream().GetOutputStreamRaw();
+        output.Write("data"sv);
+        buf.Fail = true;
+    }
+
+    REQUIRE(buf.str().substr(0, 5) == "%PDF-");
+}
+
+TEST_CASE("TestStreamedDocumentCollectGarbageRejected")
+{
+    // Garbage collection would free objects the writer still references
+    charbuff buffer;
+    auto device = std::make_shared<BufferStreamDevice>(buffer);
+    PdfStreamedDocument doc(device);
+    ASSERT_THROW_WITH_ERROR_CODE(doc.CollectGarbage(), PdfErrorCode::NotImplemented);
+    ASSERT_THROW_WITH_ERROR_CODE(doc.GetObjects().CollectGarbage(), PdfErrorCode::NotImplemented);
+}
+
 string createTestFile(const string_view& filename, size_t size)
 {
     charbuff buffer(size);

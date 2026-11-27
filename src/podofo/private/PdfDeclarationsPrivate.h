@@ -168,12 +168,23 @@ namespace PoDoFo
     class InputStream;
     class PdfPage;
     class PdfDictionaryElement;
+    class PdfObject;
 
     constexpr double DEG2RAD = std::numbers::pi / 180;
     constexpr double RAD2DEG = 180 / std::numbers::pi;
     constexpr double EPSILON = 1e-6;
     constexpr unsigned MAX_OBJECT_COUNT = (1U << 23) - 1;
     constexpr unsigned MAX_XREF_GENERATION_NUM = 65535;
+    constexpr unsigned MAX_UNICODE_CP = 0x10FFFF;
+    // NOTE: There's no CID limit in ISO 32000-2. Arbitrarily use the
+    // maximum Unicode code point, which is also the maximum CID PoDoFo
+    // can encode
+    constexpr unsigned MAX_CID = MAX_UNICODE_CP;
+    // Keywords, numbers and names longer than this are cut by the tokenizer
+    constexpr unsigned MAX_TOKEN_LENGTH = 255;
+    // Maximum entries of a parsed array or dictionary: far above real ones, such as
+    // a flat /Kids or a CIDFont /W, it bounds the memory of a single literal
+    constexpr unsigned MAX_CONTAINER_ENTRY_COUNT = 1U << 20;
 
     /// Transform the given raw rect accordingly to the page rotation
     Rect TransformCornersPage(const Corners& rect, const PdfPage& page);
@@ -196,6 +207,10 @@ namespace PoDoFo
     unsigned char GetSubsetPrefixLength(const std::string_view& fontName);
 
     void CreateObjectStructElement(PdfDictionaryElement& elem, PdfPage& page, const PdfName& elementType);
+
+    /// Move a direct object to a new indirect object, leaving a reference to it in its place
+    /// @remarks The indirect object is allocated first, so a failure leaves the object untouched
+    PdfObject& MoveToIndirect(PdfObject& obj);
 
     std::vector<std::string> ToPdfKeywordsList(const std::string_view& str);
     std::string ToPdfKeywordsString(const cspan<std::string>&keywords);
@@ -258,10 +273,6 @@ namespace utls
     public:
         RecursionGuard();
         ~RecursionGuard();
-
-    private:
-        void Enter();
-        void Exit();
     };
 
     // https://stackoverflow.com/a/14369745/213871

@@ -12,6 +12,7 @@
 #include <podofo/auxiliary/InputDevice.h>
 
 #include <podofo/main/PdfArray.h>
+#include <podofo/main/PdfCommon.h>
 #include <podofo/main/PdfDictionary.h>
 #include <podofo/main/PdfEncrypt.h>
 #include <podofo/main/PdfMemoryObjectStream.h>
@@ -281,8 +282,25 @@ bool PdfParser::tryRebuildCrossReference(InputStreamDevice& device)
                             break;
                         }
 
-                        if (genNum > numeric_limits<uint16_t>::max())
-                            PODOFO_RAISE_ERROR_INFO(PdfErrorCode::BrokenFile, "Invalid generation number");
+                        if (objNum > PdfCommon::GetMaxObjectCount())
+                        {
+                            PoDoFo::LogMessage(PdfLogSeverity::Warning,
+                                "Skipped object with number {} above the maximum object count", objNum);
+                            break;
+                        }
+
+                        if (genNum >= MAX_XREF_GENERATION_NUM)
+                        {
+                            if (m_StrictParsing)
+                            {
+                                PODOFO_RAISE_ERROR_INFO(PdfErrorCode::BrokenFile,
+                                    "Found object {} with generation number >= 65535", objNum);
+                            }
+
+                            PoDoFo::LogMessage(PdfLogSeverity::Warning,
+                                "Skipped object {} with generation number >= 65535", objNum);
+                            break;
+                        }
 
                         parserObject.reset(new PdfParserObject(m_Objects->GetDocument(),
                             PdfReference(objNum, static_cast<uint16_t>(genNum)), device, objPos));
@@ -316,6 +334,7 @@ bool PdfParser::tryRebuildCrossReference(InputStreamDevice& device)
                             }
                         }
 
+                        // NOTE: An object with the same number is replaced, the last found wins
                         if (pushObject)
                             m_Objects->PushObject(std::move(parserObject));
                     }
@@ -998,7 +1017,7 @@ void PdfParser::ReadObjectsInternal(InputStreamDevice& device)
                 }
                 case PdfXRefEntryType::Compressed:
                 {
-                    if (entry.ObjectNumber > 0 && entry.ObjectNumber < PdfParser::MaxObjectCount)
+                    if (entry.ObjectNumber > 0 && entry.ObjectNumber <= PdfCommon::GetMaxObjectCount())
                         compressedObjects[(uint32_t)entry.ObjectNumber].push_back({ i, entry.Index });
 
                     break;
@@ -1024,8 +1043,8 @@ void PdfParser::ReadObjectsInternal(InputStreamDevice& device)
     // loaded, decoding the object stream contents only when accessed
     for (auto& pair : compressedObjects)
     {
-        readCompressedObjectsFromStream(pair.first, pair.second);
-        m_Objects->AddCompressedObjectStream(pair.first);
+        if (readCompressedObjectsFromStream(pair.first, pair.second))
+            m_Objects->AddCompressedObjectStream(pair.first);
     }
 }
 
@@ -1056,7 +1075,7 @@ void PdfParser::eagerlyLoadStreams()
     }
 }
 
-void PdfParser::readCompressedObjectsFromStream(uint32_t objNo, const vector<PdfObjectStreamParser::Entry>& entries)
+bool PdfParser::readCompressedObjectsFromStream(uint32_t objNo, const vector<PdfObjectStreamParser::Entry>& entries)
 {
     // generation number of object streams is always 0
     auto streamObj = dynamic_cast<PdfParserObject*>(m_Objects->GetObject(PdfReference(objNo, 0)));
@@ -1066,10 +1085,11 @@ void PdfParser::readCompressedObjectsFromStream(uint32_t objNo, const vector<Pdf
             PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidObject, "Loading of object {} 0 R failed!", objNo);
 
         PoDoFo::LogMessage(PdfLogSeverity::Error, "Loading of object {} 0 R failed!", objNo);
-        return;
+        return false;
     }
 
     PdfObjectStreamParser::Parse(*streamObj, *m_Objects, m_buffer, &entries);
+    return true;
 }
 
 bool PdfParser::tryFindTokenBackward(InputStreamDevice& device, string_view token, size_t searchEnd)

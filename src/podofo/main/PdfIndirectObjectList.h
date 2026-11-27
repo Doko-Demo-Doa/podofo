@@ -77,6 +77,11 @@ public:
 
     PdfObject& CreateArrayObject();
 
+    /// Creates a new null object and inserts it into the vector.
+    /// This function assigns the next free object number to the PdfObject.
+    /// @remarks Useful to allocate an object before moving content into it
+    PdfObject& CreateNullObject();
+
     /// Creates a new object and inserts it into the vector.
     /// This function assigns the next free object number to the PdfObject.
     ///
@@ -88,6 +93,7 @@ public:
     /// Deletes all objects that are not references by other objects
     /// besides the trailer (which references the root dictionary, which in
     /// turn should reference all other objects).
+    /// @remarks Not supported on a PdfStreamedDocument
     void CollectGarbage(PdfGarbageCollectionFlags flags = PdfGarbageCollectionFlags::None);
 
 public:
@@ -230,6 +236,8 @@ private:
     /// the vector remains sorted w.r.t.
     /// the ordering based on object and generation numbers
     /// m_ObjectCount will be increased for the object.
+    /// An existing object with the same object number is
+    /// replaced, whatever its generation number
     ///
     /// @param obj pointer to the object you want to insert
     void PushObject(std::unique_ptr<PdfObject> obj);
@@ -247,7 +255,8 @@ private:
 
     /// Add the reference object number as an object stream
     /// @remarks These objects are usually compressed and can't be removed,
-    /// that's why the generation number is irrelevant
+    /// that's why the generation number is irrelevant. The object must exist,
+    /// as the garbage collection visits it
     void AddCompressedObjectStream(uint32_t objectNum);
 
     /// Forget the registered object streams, so their containers are

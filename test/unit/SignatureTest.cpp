@@ -427,6 +427,32 @@ TEST_CASE("TestDocTimeStamp")
     REQUIRE(ssl::ComputeMD5Str(buff) == "9371BDDDB34023CB3ADBE244690E790A");
 }
 
+TEST_CASE("TestSignatureDumpRestoreFieldName")
+{
+    charbuff buff;
+    utls::ReadTo(buff, TestUtils::GetTestInputFilePath("blank.pdf"));
+
+    {
+        auto stream = std::make_shared<BufferStreamDevice>(buff);
+        PdfMemDocument doc(stream);
+        auto& signature = doc.GetPages().GetPageAt(0).CreateField<PdfSignature>("A&B", Rect());
+
+        PdfSignerDocTimeStampParams params;
+        params.ReservedSize = 8192;
+        PdfSigningContext ctx;
+        ctx.AddSigner(signature, std::make_shared<PdfSignerDocTimeStamp>(params));
+        PdfSigningResults results;
+        ctx.StartSigning(doc, stream, results, PdfSaveOptions::NoMetadataUpdate);
+        ctx.DumpInPlace();
+    }
+
+    auto newStream = std::make_shared<BufferStreamDevice>(buff);
+    PdfSigningContext newCtx;
+    auto doc = newCtx.Restore(newStream);
+    PdfReference signatureRef;
+    REQUIRE(newCtx.GetSigner("A&B", signatureRef) != nullptr);
+}
+
 // Create a RFC 3161 TimeStampToken for the given signed hash. A regular certificate is used
 // as the TSA signer, as only the message imprint is verified when signing
 static charbuff createTimeStampToken(const bufferview& signedHash, const bufferview& cert, const bufferview& pkey)
@@ -1540,4 +1566,215 @@ TEST_CASE("TestGetSortedSignaturesInvalid")
     ASSERT_THROW_WITH_ERROR_CODE(getSignatures(TooManyRangesPdf), PdfErrorCode::InvalidObject);
     ASSERT_THROW_WITH_ERROR_CODE(getSignatures(OverlappingRangesPdf), PdfErrorCode::InvalidObject);
     ASSERT_THROW_WITH_ERROR_CODE(getSignatures(NotCoveringPreviousPdf), PdfErrorCode::InvalidObject);
+}
+
+TEST_CASE("TestGetPreviousRevisionUnsigned")
+{
+    // The first signature field has no value, the second a value that is
+    // not a dictionary: the previous revision lookup must just return false
+    string_view pdf = R"(%PDF-1.7
+1 0 obj<</Type/Catalog/Pages 2 0 R/AcroForm<</Fields[4 0 R 5 0 R]>>>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 9 9]/Annots[4 0 R 5 0 R]>>endobj
+4 0 obj<</Type/Annot/Subtype/Widget/FT/Sig/T(Unsigned)/Rect[0 0 5 5]/P 3 0 R>>endobj
+5 0 obj<</Type/Annot/Subtype/Widget/FT/Sig/T(Bogus)/V 42/Rect[0 0 5 5]/P 3 0 R>>endobj
+trailer<</Root 1 0 R/Size 6>>
+startxref
+999999
+%%EOF)";
+
+    PdfMemDocument doc;
+    doc.LoadFromBuffer(pdf);
+    SpanStreamDevice input(pdf);
+    charbuff prevBuffer;
+    BufferStreamDevice output(prevBuffer);
+    auto& form = *doc.GetAcroForm();
+    REQUIRE(!static_cast<PdfSignature&>(form.GetFieldAt(0)).TryGetPreviousRevision(input, output));
+    REQUIRE(!static_cast<PdfSignature&>(form.GetFieldAt(1)).TryGetPreviousRevision(input, output));
+
+    auto& created = doc.GetPages().GetPageAt(0).CreateField<PdfSignature>("New", Rect(0, 0, 5, 5));
+    REQUIRE(!created.TryGetPreviousRevision(input, output));
+}
+
+TEST_CASE("TestGetPreviousRevisionXRefStreamNoLength")
+{
+    // The signed revision ends with an xref stream without /Length: the parse
+    // of the previous revision runs without a document and must not use it.
+    // The trailing newline is part of the signed range
+    string_view pdf = R"(%PDF-1.5
+1 0 obj<</Type/Catalog/Pages 2 0 R/AcroForm<</Fields[4 0 R]/SigFlags 3>>>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 9 9]/Annots[4 0 R]>>endobj
+4 0 obj<</Type/Annot/Subtype/Widget/FT/Sig/T(Sig)/Rect[0 0 5 5]/P 3 0 R/V 5 0 R>>endobj
+5 0 obj<</Type/Sig/Filter/Adobe.PPKLite/ByteRange[0 373 377 181]/Contents<00>>>endobj
+6 0 obj<</Type/XRef/Size 7/W[1 2 1]/Root 1 0 R/Filter/ASCIIHexDecode>>stream
+000000FF0100090001005A0001008B000100D40001012C0001018200>
+endstream
+endobj
+startxref
+386
+%%EOF
+)";
+
+    PdfMemDocument doc;
+    doc.LoadFromBuffer(pdf);
+    SpanStreamDevice input(pdf);
+    charbuff prevBuffer;
+    BufferStreamDevice output(prevBuffer);
+    auto& signature = static_cast<PdfSignature&>(doc.GetAcroForm()->GetFieldAt(0));
+    REQUIRE(!signature.TryGetPreviousRevision(input, output));
+}
+
+TEST_CASE("TestSignatureReparentDirectValue")
+{
+    // Creating a field with the name of a loaded signature links the loaded
+    // field under a new parent and moves its direct /V there: the wrappers
+    // of the loaded field must not keep the removed value
+    string_view pdf = R"(%PDF-1.7
+1 0 obj<</Type/Catalog/Pages 2 0 R/AcroForm<</Fields[4 0 R]/SigFlags 3>>>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 9 9]/Annots[4 0 R]>>endobj
+4 0 obj<</Type/Annot/Subtype/Widget/FT/Sig/T(Signature)/Rect[0 0 5 5]/P 3 0 R/V<</Type/Sig/Name(Bob)>>>>endobj
+trailer<</Root 1 0 R/Size 5>>
+startxref
+999999
+%%EOF)";
+
+    PdfMemDocument doc;
+    doc.LoadFromBuffer(pdf);
+    auto& page = doc.GetPages().GetPageAt(0);
+    auto& widget = static_cast<PdfAnnotationWidget&>(page.GetAnnotations().GetAnnotAt(0));
+    auto& loaded = static_cast<PdfSignature&>(widget.GetField());
+    REQUIRE(loaded.GetSignerName()->GetString() == "Bob");
+
+    auto& created = page.CreateField<PdfSignature>("Signature", Rect(0, 0, 5, 5));
+    REQUIRE(loaded.GetSignerName() == nullptr);
+    REQUIRE(created.GetParent()->GetSignerName()->GetString() == "Bob");
+    loaded.SetSignerName(PdfString("Alice"));
+    REQUIRE(loaded.GetSignerName()->GetString() == "Alice");
+}
+
+// Produce a signing context dump of TestSignature.pdf, returning the hash to sign
+static charbuff createSigningContextDump(charbuff& buff, PdfSignerId& signerId)
+{
+    utls::ReadTo(buff, TestUtils::GetTestInputFilePath("TestSignature.pdf"));
+    string cert;
+    TestUtils::ReadTestInputFileTo(cert, "mycert.der");
+
+    auto stream = std::make_shared<BufferStreamDevice>(buff);
+    PdfMemDocument doc(stream);
+    auto& page = doc.GetPages().GetPageAt(0);
+    auto& signature = dynamic_cast<PdfSignature&>(dynamic_cast<PdfAnnotationWidget&>(page.GetAnnotations().GetAnnotAt(0)).GetField());
+    signature.SetSignatureDate(PdfDate::Parse("D:20250205192456+06'00'"));
+
+    PdfSignerCmsParams params;
+    PdfSigningContext ctx;
+    signerId = ctx.AddSigner(signature, std::make_shared<PdfSignerCms>(cert, params));
+    PdfSigningResults results;
+    ctx.StartSigning(doc, stream, results, PdfSaveOptions::NoMetadataUpdate);
+    ctx.DumpInPlace();
+    return results.Intermediate[signerId];
+}
+
+// Replace all the occurrences of a fragment with one of the same length
+static void tamperDump(charbuff& buff, const string_view& from, const string_view& to)
+{
+    REQUIRE(from.size() == to.size());
+    size_t pos = buff.find(from);
+    REQUIRE(pos != string::npos);
+    while (pos != string::npos)
+    {
+        buff.replace(pos, from.size(), to);
+        pos = buff.find(from, pos + to.size());
+    }
+}
+
+TEST_CASE("TestRestoreSigningContextInvalidContextIndex")
+{
+    // A context index outside the dumped contexts is rejected when restoring
+    charbuff buff;
+    PdfSignerId signerId;
+    (void)createSigningContextDump(buff, signerId);
+    tamperDump(buff, "<ContextIndex>0</ContextIndex>", "<ContextIndex>7</ContextIndex>");
+    PdfSigningContext ctx;
+    ASSERT_THROW_WITH_ERROR_CODE(ctx.Restore(std::make_shared<BufferStreamDevice>(buff)), PdfErrorCode::InvalidInput);
+}
+
+TEST_CASE("TestRestoreSigningContextNonElementContext")
+{
+    // A text node after the last context is rejected when restoring
+    charbuff buff;
+    PdfSignerId signerId;
+    (void)createSigningContextDump(buff, signerId);
+    tamperDump(buff, "</Context>\n  </Contexts>", "</Context>x\n </Contexts>");
+    PdfSigningContext ctx;
+    ASSERT_THROW_WITH_ERROR_CODE(ctx.Restore(std::make_shared<BufferStreamDevice>(buff)), PdfErrorCode::InvalidInput);
+}
+
+TEST_CASE("TestRestoreSigningContextNotASignature")
+{
+    // The restored reference must resolve to a signature widget and field
+    auto tryFinish = [](const string_view& from, const string_view& to)
+    {
+        charbuff buff;
+        PdfSignerId signerId;
+        auto hashToSign = createSigningContextDump(buff, signerId);
+        tamperDump(buff, from, to);
+        PdfSigningContext ctx;
+        auto doc = ctx.Restore(std::make_shared<BufferStreamDevice>(buff));
+
+        string pkey;
+        TestUtils::ReadTestInputFileTo(pkey, "mykey-pkcs8.der");
+        charbuff signedHash;
+        ssl::SignHash(hashToSign, pkey, PdfSignerCmsParams().Hashing, signedHash);
+        PdfSigningResults results;
+        results.Intermediate[signerId] = signedHash;
+        ctx.FinishSigning(results);
+    };
+
+    ASSERT_THROW_WITH_ERROR_CODE(tryFinish("/Subtype/Widget", "/Subtype/Text  "), PdfErrorCode::InvalidInput);
+    ASSERT_THROW_WITH_ERROR_CODE(tryFinish("/FT/Sig", "/FT/Tx "), PdfErrorCode::InvalidInput);
+    ASSERT_THROW_WITH_ERROR_CODE(tryFinish("/V 14 0 R", "         "), PdfErrorCode::InvalidObject);
+}
+
+TEST_CASE("TestRestoreSigningContextMissingByteRange")
+{
+    // A context without the byte range array is rejected when restoring
+    charbuff buff;
+    PdfSignerId signerId;
+    (void)createSigningContextDump(buff, signerId);
+    tamperDump(buff, "<ByteRangeArr>", "<ByteRangeXrr>");
+    tamperDump(buff, "</ByteRangeArr>", "</ByteRangeXrr>");
+    PdfSigningContext ctx;
+    ASSERT_THROW_WITH_ERROR_CODE(ctx.Restore(std::make_shared<BufferStreamDevice>(buff)), PdfErrorCode::InvalidInput);
+}
+
+TEST_CASE("TestRestoreSigningContextHugeFragment")
+{
+    // The footer alone declares a fragment of 16 MiB and 1 byte: the size is
+    // rejected before the seek, which would fail the short dump otherwise
+    charbuff buff(string_view("SC\x01\x00\x01\x00\x00\x01", 8));
+    PdfSigningContext ctx;
+    ASSERT_THROW_WITH_ERROR_CODE(ctx.Restore(std::make_shared<BufferStreamDevice>(buff)), PdfErrorCode::InvalidInput);
+}
+
+TEST_CASE("TestSignerCmsInvalidCertificateRetry")
+{
+    // A failed certificate load must not leave a half initialized context behind
+    string pkey;
+    TestUtils::ReadTestInputFileTo(pkey, "mykey-pkcs8.der");
+    PdfSignerCms signer(string_view("not a certificate"), pkey);
+    auto date = PdfDate::Parse("D:20250205192456+06'00'");
+    ASSERT_THROW_WITH_ERROR_CODE(signer.ValidateSignatureDate(date), PdfErrorCode::OpenSSLError);
+    ASSERT_THROW_WITH_ERROR_CODE(signer.ValidateSignatureDate(date), PdfErrorCode::OpenSSLError);
+}
+
+TEST_CASE("TestSignerCmsAddNullAttribute")
+{
+    // A DER NULL attribute value has no data to copy
+    string cert;
+    TestUtils::ReadTestInputFileTo(cert, "mycert.der");
+    PdfSignerCms signer(cert);
+    signer.AddAttribute("1.2.3.4", string_view("\x05\x00", 2), PdfSignatureAttributeFlags::SignedAttribute);
+    signer.AddAttribute("1.2.3.5", string_view("\x05\x00", 2), PdfSignatureAttributeFlags::None);
 }

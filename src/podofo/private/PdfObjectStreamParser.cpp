@@ -12,6 +12,7 @@
 #include "PdfCompressedObject.h"
 #include "PdfParser.h"
 
+#include <podofo/main/PdfCommon.h>
 #include <podofo/main/PdfDictionary.h>
 #include <podofo/main/PdfDocument.h>
 #include <podofo/main/PdfIndirectObjectList.h>
@@ -20,6 +21,33 @@
 using namespace std;
 using namespace PoDoFo;
 using namespace chromium::base;
+
+namespace
+{
+    // Object stream decode chains are never legitimately deep, while each level
+    // of this recursion costs over 20 KB of native stack in a Debug build, where 44
+    // levels already overflow the 1 MB default stack of Windows: keep the cap small
+    constexpr unsigned MaxObjectStreamDecodingDepth = 16;
+    thread_local unsigned s_objectStreamDecodingDepth = 0;
+
+    struct ObjectStreamDecodingGuard final
+    {
+        ObjectStreamDecodingGuard()
+        {
+            // Check before incrementing: a guard whose constructor throws is
+            // not destroyed, so the counter must stay untouched
+            if (s_objectStreamDecodingDepth >= MaxObjectStreamDecodingDepth)
+                PODOFO_RAISE_ERROR_INFO(PdfErrorCode::MaxRecursionReached, "Object stream decoding nested too deeply");
+
+            s_objectStreamDecodingDepth++;
+        }
+
+        ~ObjectStreamDecodingGuard()
+        {
+            s_objectStreamDecodingDepth--;
+        }
+    };
+}
 
 void PdfObjectStreamParser::Parse(PdfParserObject& streamObj, PdfIndirectObjectList& objects,
     const shared_ptr<charbuff>& buffer, const vector<Entry>* entries)
@@ -40,6 +68,7 @@ void PdfObjectStreamParser::Parse(PdfParserObject& streamObj, PdfIndirectObjectL
                 continue;
             }
 
+            // NOTE: An object with the same number is replaced, the last found wins
             pushObject(objects, parser, { parser->m_offsets[i].ObjectNumber, i });
         }
     }
@@ -122,6 +151,9 @@ void PdfObjectStreamParser::ensureDecoded()
     if (m_decoding)
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::BrokenFile, "Recursive object stream decoding");
 
+    // NOTE: m_decoding only blocks re-entry of this stream, while resolving
+    // its dictionary can chain into other object streams
+    ObjectStreamDecodingGuard decodingGuard;
     auto streamObj = m_objects->GetObject(m_streamRef);
     if (streamObj == nullptr)
     {
@@ -148,7 +180,7 @@ void PdfObjectStreamParser::decode(const PdfObject& streamObj)
     auto& dict = streamObj.GetDictionary();
     int64_t num = dict.FindKeyAsSafe<int64_t>("N", 0);
     int64_t first = dict.FindKeyAsSafe<int64_t>("First", 0);
-    if (num < 0 || first < 0 || num >= PdfParser::MaxObjectCount)
+    if (num < 0 || first < 0 || num > PdfCommon::GetMaxObjectCount())
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::BrokenFile, "Object stream has invalid object count or offset");
 
     streamObj.MustGetStream().CopyTo(m_contents);
@@ -158,12 +190,13 @@ void PdfObjectStreamParser::decode(const PdfObject& streamObj)
     tokenizer.SetParameters(m_params);
 
     m_offsets.clear();
-    m_offsets.reserve((size_t)num);
+    // NOTE: /N comes from the file: each entry takes at least 4 bytes of the decoded data
+    m_offsets.reserve(std::min((size_t)num, m_contents.size() / 4));
     for (unsigned i = 0; i < (unsigned)num; i++)
     {
         int64_t objNo = tokenizer.ReadNextNumber(device);
         int64_t offset = tokenizer.ReadNextNumber(device);
-        if (objNo < 0 || offset < 0 || objNo >= PdfParser::MaxObjectCount)
+        if (objNo < 0 || offset < 0 || objNo > PdfCommon::GetMaxObjectCount())
         {
             PODOFO_RAISE_ERROR_INFO(PdfErrorCode::BrokenFile,
                 "Object stream has invalid object number or offset");

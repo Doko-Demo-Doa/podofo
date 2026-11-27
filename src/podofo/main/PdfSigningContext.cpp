@@ -25,6 +25,9 @@ static void prepareBeaconsData(size_t signatureSize, string& contentsBeacon, str
 
 constexpr uint16_t DumpFooterMagic = 0x5343; // "SC" -> Signing Context
 constexpr uint8_t DumpFooterVersion = 1;
+// A fragment takes a few KiB per signer: the size read from the footer
+// is bounded before it drives a seek and an allocation
+constexpr uint32_t MaxXMLFragmentSize = 16 * 1024 * 1024;
 
 namespace
 {
@@ -50,7 +53,7 @@ unique_ptr<PdfMemDocument> PdfSigningContext::Restore(shared_ptr<StreamDevice> d
     if (m_status != Status::Config)
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::UnsupportedOperation, "Restore a deferred context is not allowed");
 
-    void InitXml();
+    utls::InitXml();
 
     device->Seek(-(ssize_t)sizeof(SigningContextDumpFooter), SeekDirection::End);
     SigningContextDumpFooter footer;
@@ -64,18 +67,23 @@ unique_ptr<PdfMemDocument> PdfSigningContext::Restore(shared_ptr<StreamDevice> d
     if (footer.Version != DumpFooterVersion)
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidInput, "Unsupported PdfSigningContext footer version");
 
+    if (footer.XMLFragmentSize > MaxXMLFragmentSize)
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidInput, "The PdfSigningContext XML fragment exceeds the maximum size of {} bytes", MaxXMLFragmentSize);
+
     device->Seek(-(ssize_t)(sizeof(SigningContextDumpFooter) + footer.XMLFragmentSize), SeekDirection::End);
 
     charbuff temp(footer.XMLFragmentSize);
     device->Read(temp.data(), footer.XMLFragmentSize);
 
     unique_ptr<xmlDoc, decltype(&xmlFreeDoc)> doc(xmlReadMemory(temp.data(), (int)temp.size(), nullptr, nullptr, XML_PARSE_NOBLANKS), xmlFreeDoc);
-    xmlNodePtr sigCtxElem;
-    if (doc == nullptr
-        || (sigCtxElem = xmlDocGetRootElement(doc.get())) == nullptr)
+    if (doc == nullptr)
+        THROW_LIBXML_EXCEPTION(PdfErrorCode::InvalidInput, "PdfSigningContext parsing failed");
+
+    auto sigCtxElem = xmlDocGetRootElement(doc.get());
+    if (sigCtxElem == nullptr)
     {
     DeserializationFailed:
-        THROW_LIBXML_EXCEPTION("PdfSigningContext deserialization failed");
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidInput, "PdfSigningContext deserialization failed");
     }
 
     m_signers.clear();
@@ -165,11 +173,10 @@ unique_ptr<PdfMemDocument> PdfSigningContext::Restore(shared_ptr<StreamDevice> d
     if (node == nullptr)
         goto DeserializationFailed;
 
-    unsigned i = 0;
-    m_contexts.resize(xmlChildElementCount(node));
+    m_contexts.reserve(xmlChildElementCount(node));
     for (auto child = node->children; child != nullptr; child = child->next)
     {
-        auto& ctx = m_contexts[i];
+        auto& ctx = m_contexts.emplace_back();
 
         node = utls::FindChildElement(child, "BeaconSize");
         if (node == nullptr || node->children == nullptr || node->children->content == nullptr
@@ -178,7 +185,7 @@ unique_ptr<PdfMemDocument> PdfSigningContext::Restore(shared_ptr<StreamDevice> d
         ctx.BeaconSize = num1;
 
         auto byteRangeArrElem = utls::FindChildElement(child, "ByteRangeArr");
-        if (node == nullptr)
+        if (byteRangeArrElem == nullptr)
             goto DeserializationFailed;
 
         for (auto item = byteRangeArrElem->children; item != nullptr; item = item->next)
@@ -190,7 +197,7 @@ unique_ptr<PdfMemDocument> PdfSigningContext::Restore(shared_ptr<StreamDevice> d
         }
 
         auto beaconsArrElem = utls::FindChildElement(child, "Beacons");
-        if (node == nullptr)
+        if (beaconsArrElem == nullptr)
             goto DeserializationFailed;
 
         node = utls::FindChildElement(beaconsArrElem, "ContentsOffset");
@@ -204,8 +211,14 @@ unique_ptr<PdfMemDocument> PdfSigningContext::Restore(shared_ptr<StreamDevice> d
                 || !utls::TryParse((const char*)node->children->content, num3))
             goto DeserializationFailed;
         *ctx.Beacons.ByteRangeOffset = (size_t)num3;
+    }
 
-        i++;
+    // The context indices come from the dump as well: check
+    // they address the contexts actually deserialized
+    for (auto& pair : m_signers)
+    {
+        if (pair.second.ContextIndex >= m_contexts.size())
+            goto DeserializationFailed;
     }
 
     // Truncate the stream just before the XML fragment
@@ -273,7 +286,7 @@ void PdfSigningContext::DumpInPlace()
     if (m_status != Status::Started)
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::UnsupportedOperation, "Only a non-restored deferred context can be dumped");
 
-    void InitXml();
+    utls::InitXml();
 
     m_device->Seek(0, SeekDirection::End);
 
@@ -284,7 +297,7 @@ void PdfSigningContext::DumpInPlace()
     if (sigCtxElem == nullptr)
     {
     SerializationFailed:
-        THROW_LIBXML_EXCEPTION("PdfSigningContext serialization failed");
+        THROW_LIBXML_EXCEPTION(PdfErrorCode::OutOfMemory, "PdfSigningContext serialization failed");
     }
 
     // TODO: Persist and obtain load options from PdfMemDocument
@@ -312,7 +325,7 @@ void PdfSigningContext::DumpInPlace()
             goto SerializationFailed;
 
         auto keyElem = xmlNewChild(signatureElem, nullptr, XMLCHAR "Key", nullptr);
-        if (signatureElem == nullptr)
+        if (keyElem == nullptr)
             goto SerializationFailed;
 
         utls::FormatTo(temp, ref.ObjectNumber());
@@ -327,7 +340,7 @@ void PdfSigningContext::DumpInPlace()
         if (valueElem == nullptr)
             goto SerializationFailed;
 
-        if (xmlNewChild(valueElem, nullptr, XMLCHAR "SignatureFullName", XMLCHAR descs.SignatureFullName.data()) == nullptr)
+        if (xmlNewTextChild(valueElem, nullptr, XMLCHAR "SignatureFullName", XMLCHAR descs.SignatureFullName.data()) == nullptr)
             goto SerializationFailed;
 
         utls::FormatTo(temp, descs.SignaturePageIndex);
@@ -409,7 +422,7 @@ void PdfSigningContext::DumpInPlace()
 
     string serialized;
     if (!utls::TrySerializeXmlDocTo(serialized, fragment.get()))
-        THROW_LIBXML_EXCEPTION("Can't serialize signing context");
+        THROW_LIBXML_EXCEPTION(PdfErrorCode::OutOfMemory, "Can't serialize signing context");
 
     m_device->Write(serialized);
 
@@ -744,15 +757,33 @@ PdfSignerId::PdfSignerId()
 PdfSignerId::PdfSignerId(const PdfReference& ref, unsigned signerIndex)
     : m_SignatureRef(ref), m_SignerIndex(signerIndex) { }
 
+// NOTE: The reference and page index may come from a restored dump,
+// so the resolved annotation and field types are checked
 PdfSignature& getSignature(PdfDocument& doc, int pageIndex, const PdfReference& signatureRef)
 {
+    PdfField* field;
     if (pageIndex >= 0)
     {
         auto& page = doc.GetPages().GetPageAt((unsigned)pageIndex);
-        return static_cast<PdfSignature&>(static_cast<PdfAnnotationWidget&>(page.GetAnnotations().GetAnnot(signatureRef)).GetField());
+        auto& annot = page.GetAnnotations().GetAnnot(signatureRef);
+        if (annot.GetType() != PdfAnnotationType::Widget)
+        {
+            PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidInput, "The annotation {} {} R is not a widget",
+                signatureRef.ObjectNumber(), signatureRef.GenerationNumber());
+        }
+
+        field = &static_cast<PdfAnnotationWidget&>(annot).GetField();
     }
     else
     {
-        return  static_cast<PdfSignature&>(doc.MustGetAcroForm().GetField(signatureRef));
+        field = &doc.MustGetAcroForm().GetField(signatureRef);
     }
+
+    if (field->GetType() != PdfFieldType::Signature)
+    {
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidInput, "The field {} {} R is not a signature",
+            signatureRef.ObjectNumber(), signatureRef.GenerationNumber());
+    }
+
+    return static_cast<PdfSignature&>(*field);
 }

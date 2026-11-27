@@ -870,3 +870,34 @@ void drawSquareWithCross(PdfPainter& painter, double x, double y)
     painter.DrawLine(x - SquareSize / 2, y, x + SquareSize / 2, y);
     painter.Restore();
 }
+
+TEST_CASE("TestPainterPathAddSelf")
+{
+    PdfPainterPath path;
+    path.MoveTo(1, 2);
+    for (int i = 0; i < 20; i++)
+        path.AddLineTo(i * 3.5, i * 7.25);
+
+    string content(path.GetContent());
+    path.AddPath(path, false);
+    REQUIRE(path.GetContent() == content + content);
+}
+
+TEST_CASE("TestPainterResetWithOpenStates")
+{
+    // Finishing with saved states left must clear them all and re-point the state wrappers
+    PdfMemDocument doc;
+    auto& page = doc.GetPages().CreatePage(PdfPageSize::A4);
+    PdfPainter painter;
+    painter.SetCanvas(page);
+    painter.Save();
+    painter.Save();
+    painter.GraphicsState.SetLineWidth(5);
+    painter.FinishDrawing();
+    REQUIRE(painter.GetStateStack().GetSize() == 1);
+
+    painter.SetCanvas(page);
+    painter.GraphicsState.SetLineWidth(3);
+    REQUIRE(painter.GetStateStack().Current->GraphicsState.LineWidth == 3);
+    painter.FinishDrawing();
+}

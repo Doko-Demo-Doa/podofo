@@ -287,6 +287,7 @@ private:
     // To be called by PdfPageCollection
     void FlattenStructure();
     void SetIndex(unsigned index) { m_Index = index; }
+    static cspan<PdfName> GetInheritableAttributes();
 
     void CopyContentsTo(OutputStream& stream) const override;
 
@@ -303,8 +304,6 @@ private:
     PdfDictionaryElement& getElement() override;
 
     PdfObject* findInheritableAttribute(const std::string_view& name) const;
-
-    PdfObject* findInheritableAttribute(const std::string_view& name, bool& isShallow) const;
 
     void ensureContentsCreated();
 

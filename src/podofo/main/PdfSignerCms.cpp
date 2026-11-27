@@ -244,7 +244,7 @@ void PdfSignerCms::Dump(xmlNodePtr signerElem, string& temp)
     if (xmlNewChild(signerElem, nullptr, XMLCHAR "ReservedSize", XMLCHAR temp.data()) == nullptr)
     {
     SerializationFailed:
-        THROW_LIBXML_EXCEPTION("PdfSignerCms serialization failed");
+        THROW_LIBXML_EXCEPTION(PdfErrorCode::OutOfMemory, "PdfSignerCms serialization failed");
     }
 
     utls::WriteHexStringTo(temp, m_certificate);
@@ -293,7 +293,7 @@ void PdfSignerCms::Restore(xmlNodePtr signerElem, charbuff& temp)
     if (node == nullptr)
     {
     DeserializationFailed:
-        THROW_LIBXML_EXCEPTION("PdfSignerCms deserialization failed");
+        PODOFO_RAISE_ERROR_INFO(PdfErrorCode::InvalidInput, "PdfSignerCms deserialization failed");
     }
     if (node == nullptr || node->children == nullptr || node->children->content == nullptr
             || !utls::TryParse((const char*)node->children->content, num1))
@@ -312,7 +312,7 @@ void PdfSignerCms::Restore(xmlNodePtr signerElem, charbuff& temp)
     m_cmsContext->Restore(node, temp);
 
     auto parametersNode = utls::FindChildElement(signerElem, "Parameters");
-    if (node == nullptr)
+    if (parametersNode == nullptr)
         goto DeserializationFailed;
 
     node = utls::FindChildElement(parametersNode, "SignatureType");
@@ -385,11 +385,8 @@ void PdfSignerCms::checkContextInitialized()
 
 void PdfSignerCms::ensureContextInitialized()
 {
-    if (m_cmsContext != nullptr)
-        return;
-
-    m_cmsContext.reset(new CmsContext());
-    resetContext();
+    if (m_cmsContext == nullptr)
+        resetContext();
 }
 
 void PdfSignerCms::resetContext()
@@ -427,10 +424,12 @@ void PdfSignerCms::resetContext()
         }
     }
 
-    m_cmsContext->Reset(m_certificate, params);
-
+    // Replace the context only once the new one is initialized
+    unique_ptr<CmsContext> context(new CmsContext());
+    context->Reset(m_certificate, params);
     for (auto& chainCert : m_chainCertificates)
-        m_cmsContext->AddCertificate(chainCert);
+        context->AddCertificate(chainCert);
+    m_cmsContext = std::move(context);
 }
 
 bool PdfSignerCms::shouldVerify() const

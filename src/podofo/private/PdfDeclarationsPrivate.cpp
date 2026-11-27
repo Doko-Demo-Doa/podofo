@@ -74,9 +74,29 @@ template<typename TInt, class = typename std::enable_if_t<std::is_integral_v<TIn
 void formatTo(string& str, TInt value)
 {
     str.clear();
-    array<char, numeric_limits<TInt>::digits10> arr;
+    // As in fmt, digits10 + 1 is the digit count of the maximum, plus the sign
+    array<char, numeric_limits<TInt>::digits10 + 2> arr;
     auto res = std::to_chars(arr.data(), arr.data() + arr.size(), value);
     str.append(arr.data(), res.ptr - arr.data());
+}
+
+template<typename TFloat>
+void formatTo(string& str, TFloat value, unsigned short precision)
+{
+    // Grow until the fixed notation fits: almost every number fits the first size
+    size_t size = FloatFormatDefaultSize;
+    while (true)
+    {
+        str.resize(size);
+        auto result = std::to_chars(str.data(), str.data() + size, value, chars_format::fixed, precision);
+        if (result.ec == errc{ })
+        {
+            removeTrailingZeroes(str, result.ptr - str.data());
+            return;
+        }
+
+        size *= 2;
+    }
 }
 
 void PoDoFo::LogMessage(PdfLogSeverity logSeverity, const string_view& msg)
@@ -761,6 +781,16 @@ void PoDoFo::CreateObjectStructElement(PdfDictionaryElement& elem, PdfPage& page
     elem.GetDictionary().AddKey("StructParent"_n, PdfObject(structParentKey));
 }
 
+PdfObject& PoDoFo::MoveToIndirect(PdfObject& obj)
+{
+    PODOFO_ASSERT(!obj.IsIndirect());
+    auto& ret = obj.MustGetDocument().GetObjects().CreateNullObject();
+    // NOTE: The move assignment keeps the reference and the document of the target
+    ret = std::move(obj);
+    obj = PdfObject(ret.GetIndirectReference());
+    return ret;
+}
+
 const locale& utls::GetInvariantLocale()
 {
     return s_cachedLocale;
@@ -1199,7 +1229,8 @@ FILE* utls::fopen(const string_view& filename, const string_view& mode)
     auto mode16 = utf8::utf8to16((string)mode);
     return _wfopen((wchar_t*)filename16.c_str(), (wchar_t*)mode16.c_str());
 #else
-    return std::fopen(filename.data(), mode.data());
+    // NOTE: The views may not be NUL terminated
+    return std::fopen(string(filename).c_str(), string(mode).c_str());
 #endif
 }
 
@@ -1383,34 +1414,22 @@ void utls::FormatTo(string& str, unsigned long long value)
 
 void utls::FormatTo(string& str, float value, unsigned short precision)
 {
-    // The default size should be large enough to format all
-    // numbers with fixed notation. See https://stackoverflow.com/a/52045523/213871
-    str.resize(FloatFormatDefaultSize);
-    auto result = std::to_chars(str.data(), str.data() + FloatFormatDefaultSize, value, chars_format::fixed, precision);
-    removeTrailingZeroes(str, result.ptr - str.data());
+    formatTo(str, value, precision);
 }
 
 void utls::FormatTo(string& str, double value, unsigned short precision)
 {
-    str.resize(FloatFormatDefaultSize);
-    auto result = std::to_chars(str.data(), str.data() + FloatFormatDefaultSize, value, chars_format::fixed, precision);
-    if (result.ec == errc::value_too_large)
-    {
-        // See https://stackoverflow.com/a/52045523/213871
-        // 24 recommended - 5 (unnecessary) exponent = 19
-        constexpr unsigned DoubleFormatDefaultSize = 19;
-        str.resize(DoubleFormatDefaultSize);
-        result = std::to_chars(str.data(), str.data() + DoubleFormatDefaultSize, value, chars_format::fixed, precision);
-    }
-    removeTrailingZeroes(str, result.ptr - str.data());
+    formatTo(str, value, precision);
 }
 
-// NOTE: This is clearly limited, since it's supporting only ASCII
+// NOTE: This is clearly limited, since it's supporting only ASCII. It does
+// not depend on the host locale: a single byte locale, such as Latin-1,
+// would also lower the UTF-8 lead bytes and corrupt the multi byte sequences
 string utls::ToLower(const string_view& str)
 {
     string ret = (string)str;
     std::transform(ret.begin(), ret.end(), ret.begin(),
-        [](unsigned char c) { return std::tolower(c); });
+        [](char c) { return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c; });
     return ret;
 }
 
@@ -1821,10 +1840,11 @@ void utls::ReadInt16BE(const char* buf, int16_t& value)
         | (int16_t)((int8_t)buf[0]  << 8);
 }
 
-void utls::RecursionGuard::Enter()
+utls::RecursionGuard::RecursionGuard()
 {
-    s_recursionDepth++;
-    if (s_recursionDepth > s_MaxRecursionDepth)
+    // Check before incrementing: the destructor of a guard whose
+    // constructor throws never runs, so the counter must stay untouched
+    if (s_recursionDepth >= s_MaxRecursionDepth)
     {
         // avoid stack overflow on documents that have circular cross references, loops
         // or very deeply nested structures, can happen with
@@ -1834,42 +1854,32 @@ void utls::RecursionGuard::Enter()
         // mutually recursive loops involving several objects are possible
         PODOFO_RAISE_ERROR_INFO(PdfErrorCode::MaxRecursionReached, "Stack overflow");
     }
-}
 
-void utls::RecursionGuard::Exit()
-{
-    s_recursionDepth--;
-}
-
-utls::RecursionGuard::RecursionGuard()
-{
-    Enter();
+    s_recursionDepth++;
 }
 
 utls::RecursionGuard::~RecursionGuard()
 {
-    Exit();
+    s_recursionDepth--;
 }
 
 void removeTrailingZeroes(string& str, size_t len)
 {
-    // Remove trailing zeroes
+    // NOTE: Trim only after a decimal point: without one, as with precision 0,
+    // the trailing zeroes are significant, with one the loop stops there at worst
     const char* cursor = str.data();
-    while (cursor[len - 1] == '0')
-        len--;
-
-    if (cursor[len - 1] == '.')
-        len--;
-
-    if (len == 0)
+    if (std::memchr(cursor, '.', len) != nullptr)
     {
-        str.resize(1);
-        str[0] = '0';
+        // Remove trailing zeroes
+        while (cursor[len - 1] == '0')
+            len--;
+
+        if (cursor[len - 1] == '.')
+            len--;
     }
-    else
-    {
-        str.resize(len);
-    }
+
+    PODOFO_INVARIANT(len != 0);
+    str.resize(len);
 }
 
 char getEscapedCharacter(char ch)

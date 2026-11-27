@@ -558,9 +558,11 @@ PdfObject& PdfObject::operator=(const PdfObject& rhs)
 
 PdfObject& PdfObject::operator=(PdfObject&& rhs) noexcept
 {
+    // NOTE: rhs is set dirty first, as it's destroyed by the move
+    // when nested in the container owned by this object
+    rhs.SetDirty();
     moveFrom(std::move(rhs));
     SetDirty();
-    rhs.SetDirty();
     return *this;
 }
 
@@ -575,7 +577,13 @@ void PdfObject::copyStreamFrom(const PdfObject& obj)
         const_cast<PdfObject&>(obj).MakeDelayedLoadingStreamDone();
     }
 
-    if (obj.m_Stream != nullptr)
+    if (obj.m_Stream == nullptr)
+    {
+        // The stream mirrors the one of obj, so the stream
+        // of the replaced content, if any, is dropped
+        m_Stream = nullptr;
+    }
+    else
     {
         auto& stream = getOrCreateStream();
         stream.CopyFrom(*obj.m_Stream);
@@ -637,6 +645,7 @@ void PdfObject::AssignNoDirtySet(PdfVariant&& rhs)
     m_Variant = std::move(rhs);
     m_IsDelayedLoadDone = true;
     SetVariantOwner();
+    removeStream();
     m_Stream = nullptr;
     m_IsDelayedLoadStreamDone = true;
 }
@@ -680,10 +689,18 @@ void PdfObject::assertMutable() const
 // Objects being assigned always keep current ownership
 void PdfObject::assign(const PdfObject& rhs)
 {
+    if (&rhs == this)
+        return;
+
     rhs.DelayedLoad();
+    // NOTE: rhs may be nested in the container of this object, so the
+    // current content is kept alive until rhs has been fully copied
+    auto current = std::move(m_Variant);
     m_Variant = rhs.m_Variant;
     SetVariantOwner();
     m_IsDelayedLoadDone = true;
+    // Drop a stream of this object still to be parsed
+    removeStream();
     copyStreamFrom(rhs);
     m_IsDelayedLoadStreamDone = true;
 }
@@ -692,15 +709,22 @@ void PdfObject::assign(const PdfObject& rhs)
 // Objects being assigned always keep current ownership
 void PdfObject::moveFrom(PdfObject&& rhs) noexcept
 {
+    if (&rhs == this)
+        return;
+
     // NOTE: move should not throw, as it's used in "noexcept" moethods
     if (!rhs.m_IsDelayedLoadStreamDone)
         rhs.DelayedLoadStream(false);
     else if (!rhs.m_IsDelayedLoadDone)
         rhs.DelayedLoad(false);
 
+    // NOTE: As in assign(), keep the current content alive until rhs has been moved
+    auto current = std::move(m_Variant);
     m_Variant = std::move(rhs.m_Variant);
     SetVariantOwner();
     m_IsDelayedLoadDone = true;
+    // Drop a stream of this object still to be parsed
+    removeStream();
     m_Stream = std::move(rhs.m_Stream);
     if (m_Stream != nullptr)
         m_Stream->SetParent(*this);

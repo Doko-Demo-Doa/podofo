@@ -585,6 +585,26 @@ TEST_CASE("TestChangeEncryptionOnUpdateRejected")
     saveUpdate(encryptedPath);
 }
 
+// A copy of an AES-256 document must keep the whole /UE and /OE values,
+// or the saved copy can't be decrypted with either password
+TEST_CASE("TestCopyAESV3Document")
+{
+    PdfMemDocument doc;
+    doc.Load(TestUtils::GetTestInputFilePath("AESV3R6-256.pdf"), "userpass");
+    PdfMemDocument copy(doc);
+    charbuff pdfBuffer;
+    BufferStreamDevice device(pdfBuffer);
+    copy.Save(device);
+
+    charbuff objBuffer;
+    for (auto password : { "userpass", "ownerpass" })
+    {
+        doc.LoadFromBuffer(pdfBuffer, password);
+        doc.GetObjects().MustGetObject(PdfReference(11, 0)).MustGetStream().CopyTo(objBuffer);
+        REQUIRE(ssl::ComputeMD5Str(objBuffer) == ReferenceHash_R_11_0);
+    }
+}
+
 void testEncrypt(PdfEncrypt& encrypt, PdfEncryptContext& context)
 {
     charbuff encrypted;
@@ -661,4 +681,36 @@ void createEncryptedPdf(const string_view& filename)
     doc.Save(filename);
 
     INFO(utls::Format("Wrote: {} (R={})", filename, doc.GetEncrypt()->GetRevision()));
+}
+
+TEST_CASE("TestAESInputStreamSmallReads")
+{
+    // The cipher may output more bytes than a read asks for: the excess must wait for the next read
+    auto encrypt = PdfEncrypt::Create(PDF_USER_PASSWORD, PDF_OWNER_PASSWORD, s_protection,
+        PdfEncryptionAlgorithm::AESV2, PdfKeyLength::L128);
+    PdfEncryptContext context;
+    encrypt->EnsureEncryptionInitialized(PdfString::FromHexData("BF37541A9083A51619AD5924ECF156DF"), context);
+    charbuff encrypted;
+    encrypt->EncryptTo(encrypted, s_encBuffer, context, PdfReference(7, 0));
+
+    SpanStreamDevice input(encrypted);
+    auto stream = encrypt->CreateEncryptionInputStream(input, encrypted.size(), context, PdfReference(7, 0));
+    string decrypted;
+    char ch;
+    while (stream->Read(ch))
+        decrypted.push_back(ch);
+
+    REQUIRE(decrypted == s_encBuffer);
+
+    SpanStreamDevice input2(encrypted);
+    stream = encrypt->CreateEncryptionInputStream(input2, encrypted.size(), context, PdfReference(7, 0));
+    decrypted.clear();
+    char buffer[7];
+    bool eof;
+    do
+    {
+        decrypted.append(buffer, stream->Read(buffer, sizeof(buffer), eof));
+    } while (!eof);
+
+    REQUIRE(decrypted == s_encBuffer);
 }
